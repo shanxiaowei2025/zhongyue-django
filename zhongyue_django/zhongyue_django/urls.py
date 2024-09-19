@@ -16,10 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from users.views import LoginView, RefreshTokenView
+from users.views import LoginView, RefreshTokenView, get_async_routes
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('login/', LoginView.as_view(), name='login'),
-    # path('refresh-token/', RefreshTokenView.as_view(), name='refresh-token'),
+    path('refresh-token/', RefreshTokenView.as_view(), name='refresh-token'),
+    path('get-async-routes/', get_async_routes, name='get_async_routes'),
 ]
