@@ -23,4 +23,5 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('refresh-token/', RefreshTokenView.as_view(), name='refresh-token'),
     path('get-async-routes/', get_async_routes, name='get_async_routes'),
+    
 ]

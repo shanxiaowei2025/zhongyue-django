@@ -11,7 +11,8 @@ from rest_framework_simplejwt.exceptions import TokenError
 import logging
 import datetime
 from .models import AsyncRoute
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ class RefreshTokenView(APIView):
             return Response({"success": False, "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_async_routes(request):
     top_level_routes = AsyncRoute.objects.filter(parent=None)
     routes_data = [route.to_dict() for route in top_level_routes]
