@@ -168,10 +168,22 @@ def update_user(request):
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-    print("----------------")
-    print(data)
-    user_serializer = UserSerializer(user, data=data, partial=True)
+    
+    user_data = {
+        'username': data.get('username'),
+        'email': data.get('email'),
+        'profile': {
+            'nickname': data.get('nickname'),
+            'phone': data.get('phone'),
+            'sex': data.get('sex'),
+            'status': data.get('status'),
+            'remark': data.get('remark'),
+            'dept_id': data.get('parentId')
+        }
+    }
+    
+    user_serializer = UserSerializer(user, data=user_data, partial=True)
     if user_serializer.is_valid():
-        user_serializer.save()
-        return JsonResponse({'success': True, 'data': user_serializer.data}, status=status.HTTP_200_OK)
+        updated_user = user_serializer.save()
+        return JsonResponse({'success': True, 'data': UserSerializer(updated_user).data}, status=status.HTTP_200_OK)
     return JsonResponse({'success': False, 'errors': user_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
