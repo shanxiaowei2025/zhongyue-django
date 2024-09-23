@@ -16,12 +16,25 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from users.views import LoginView, RefreshTokenView, get_async_routes
+from users.views import (
+    LoginView, 
+    RefreshTokenView, 
+    get_async_routes, 
+    get_user_list, 
+    get_all_role_list, 
+    get_role_ids,
+    create_user,  # 新增
+    update_user   # 新增
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('login/', LoginView.as_view(), name='login'),
     path('refresh-token/', RefreshTokenView.as_view(), name='refresh-token'),
     path('get-async-routes/', get_async_routes, name='get_async_routes'),
-    
+    path('user', get_user_list, name='get_user_list'),
+    path('list-all-role', get_all_role_list, name='get_all_role_list'),
+    path('list-role-ids', get_role_ids, name='get_role_ids'),
+    path('user/create', create_user, name='create_user'),  # 新增
+    path('user/update', update_user, name='update_user'),  # 新增
 ]

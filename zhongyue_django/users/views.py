@@ -4,22 +4,24 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserSerializer, LoginSerializer
+from .serializers import UserSerializer, LoginSerializer, UserProfileSerializer
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.exceptions import TokenError
 import logging
 import datetime
-from .models import AsyncRoute
+from .models import AsyncRoute, UserProfile, Role
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from django.http import JsonResponse
+from django.core.paginator import Paginator
+import json
+from django.contrib.auth.models import User  # 添加这一行
 
 logger = logging.getLogger(__name__)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
-    # 保持原有的 post 方法不变
-
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
@@ -36,7 +38,6 @@ class LoginView(APIView):
                         'username': user_data['username'],
                         'nickname': user_data['profile']['nickname'],
                         'roles': user_data['profile']['roles'],
-                        'permissions': user_data['profile']['permissions'],
                         'accessToken': str(refresh.access_token),
                         'refreshToken': str(refresh),
                         'expires': refresh.access_token.payload['exp']
@@ -83,4 +84,94 @@ def get_async_routes(request):
         "data": routes_data
     })
 
-# Create your views here.
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_user_list(request):
+    data = json.loads(request.body)
+    username = data.get('username', '')
+    status = data.get('status',1)
+    dept_id = data.get('deptId')
+    page = data.get('currentPage', 1)
+    page_size = data.get('pageSize', 10)
+
+    user_profiles = UserProfile.objects.all()
+    if username:
+        user_profiles = user_profiles.filter(user__username__icontains=username)
+    if status is not None:
+        user_profiles = user_profiles.filter(status=status)
+    if dept_id:
+        user_profiles = user_profiles.filter(dept_id=dept_id)
+
+    paginator = Paginator(user_profiles, page_size)
+    user_profiles_page = paginator.get_page(page)
+
+    serializer = UserProfileSerializer(user_profiles_page, many=True)
+
+    return JsonResponse({
+        'success': True,
+        'data': {
+            'list': serializer.data,
+            'total': paginator.count,
+            'pageSize': page_size,
+            'currentPage': page
+        }
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_role_list(request):
+    roles = Role.objects.all()
+    return JsonResponse({
+        'success': True,
+        'data': [role.to_dict() for role in roles]
+    })
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_role_ids(request):
+    data = json.loads(request.body)
+    user_id = data.get('userId')
+    if user_id:
+        user_profile = UserProfile.objects.get(user_id=user_id)
+        role_ids = user_profile.roles
+        return JsonResponse({
+            'success': True,
+            'data': role_ids
+        })
+    else:
+        return JsonResponse({
+            'success': False,
+            'data': []
+        })
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_user(request):
+    data = json.loads(request.body)
+    user_serializer = UserSerializer(data=data)
+    if user_serializer.is_valid():
+        user = user_serializer.save()
+        user.set_password(data['password'])
+        user.save()
+        return JsonResponse({'success': True, 'data': user_serializer.data}, status=status.HTTP_201_CREATED)
+    return JsonResponse({'success': False, 'errors': user_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_user(request):
+    data = json.loads(request.body)
+    user_id = data.get('id')
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    print("----------------")
+    print(data)
+    user_serializer = UserSerializer(user, data=data, partial=True)
+    if user_serializer.is_valid():
+        user_serializer.save()
+        return JsonResponse({'success': True, 'data': user_serializer.data}, status=status.HTTP_200_OK)
+    return JsonResponse({'success': False, 'errors': user_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
