@@ -17,6 +17,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 import json
 from django.contrib.auth.models import User  # 添加这一行
+import time  # 添加这一行
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class LoginView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class RefreshTokenView(APIView):
     def post(self, request):
-        refresh_token = request.data.get('refresh')
+        refresh_token = request.data.get('refreshToken')
         if not refresh_token:
             logger.error("Refresh token is missing")
             return Response({"success": False, "message": "Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -58,14 +59,15 @@ class RefreshTokenView(APIView):
             token = RefreshToken(refresh_token)
             access_token = str(token.access_token)
             new_refresh_token = str(token)
-            expires = datetime.fromtimestamp(token.access_token.payload['exp'])
+            expires_timestamp = token.access_token.payload['exp']
+            expires = time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(expires_timestamp))  # 使用 time 模块转换时间戳
 
             response_data = {
                 "success": True,
                 "data": {
                     "accessToken": access_token,
                     "refreshToken": new_refresh_token,
-                    "expires": expires.strftime('%Y/%m/%d %H:%M:%S')
+                    "expires": expires
                 }
             }
             logger.info(f"Refresh token response: {response_data}")
@@ -151,7 +153,21 @@ def get_role_ids(request):
 @permission_classes([IsAuthenticated])
 def create_user(request):
     data = json.loads(request.body)
-    user_serializer = UserSerializer(data=data)
+    user_data = {
+        'username': data.get('username'),
+        'email': data.get('email'),
+        'password': data.get('password'),
+        'profile': {
+            'nickname': data.get('nickname'),
+            'phone': data.get('phone'),
+            'sex': data.get('sex'),
+            'status': data.get('status'),
+            'remark': data.get('remark'),
+            'dept_id': data.get('parentId')
+        }
+    }
+    print("user_data", user_data)
+    user_serializer = UserSerializer(data=user_data, partial=True)
     if user_serializer.is_valid():
         user = user_serializer.save()
         user.set_password(data['password'])
@@ -159,6 +175,7 @@ def create_user(request):
         return JsonResponse({'success': True, 'data': user_serializer.data}, status=status.HTTP_201_CREATED)
     return JsonResponse({'success': False, 'errors': user_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_user(request):

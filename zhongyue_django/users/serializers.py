@@ -22,6 +22,12 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'profile')
 
+    def create(self, validated_data):
+        profile_data = validated_data.pop('profile')
+        user = User.objects.create(**validated_data)
+        # 删除 UserProfile 的创建逻辑
+        return user
+
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('profile', {})
         for attr, value in validated_data.items():
