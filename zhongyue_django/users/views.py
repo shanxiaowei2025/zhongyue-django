@@ -85,7 +85,7 @@ class RefreshTokenView(APIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_async_routes(request):
-    top_level_routes = AsyncRoute.objects.filter(parent=None)
+    top_level_routes = AsyncRoute.objects.filter(parent=None)  # 只获取启用的顶级路由
     routes_data = [route.to_dict() for route in top_level_routes]
     return Response({
         "success": True,
@@ -98,7 +98,7 @@ def get_async_routes(request):
 def get_user_list(request):
     data = json.loads(request.body)
     username = data.get('username', '')
-    status = data.get('status', 1)
+    status = data.get('status')
     dept_id = data.get('deptId')
     page = data.get('currentPage', 1)
     page_size = data.get('pageSize', 10)
@@ -106,7 +106,7 @@ def get_user_list(request):
     users = User.objects.all()
     if username:
         users = users.filter(username__icontains=username)
-    if status is not None:
+    if status != '':
         users = users.filter(status=status)
     if dept_id:
         users = users.filter(dept_id=dept_id)
@@ -134,11 +134,14 @@ def get_role_ids(request):
     if user_id:
         try:
             user = User.objects.get(id=user_id)
-            role_names = user.roles  # 这里存储的是角色名称列表
+            role_names = user.roles  # 假设这是角色名称列表
+            
+            # 获取对应的角色ID
+            role_ids = Role.objects.filter(name__in=role_names).values_list('id', flat=True)
             
             return JsonResponse({
                 'success': True,
-                'data': role_names
+                'data': list(role_ids)  # 转换为列表，因为 QuerySet 不能直接 JSON 序列化
             })
         except User.DoesNotExist:
             return JsonResponse({
@@ -302,7 +305,7 @@ def get_role_list(request):
     roles = Role.objects.all().order_by('-create_time')  # 按创建时间降序排序
     if name:
         roles = roles.filter(name__icontains=name)
-    if status is not None:
+    if status != '':
         roles = roles.filter(status=status)
     if code:
         roles = roles.filter(code=code)
@@ -364,3 +367,51 @@ def update_user_roles(request):
             'success': False,
             'message': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_role(request):
+    data = json.loads(request.body)
+    role_data = {
+        'name': data.get('name'),
+        'code': data.get('code'),
+        'status': data.get('status', 1),
+        'remark': data.get('remark')
+    }
+    print(role_data)
+    role_serializer = RoleSerializer(data=role_data)
+    
+    if role_serializer.is_valid():
+        role = role_serializer.save()
+        return JsonResponse({'success': True, 'data': role_serializer.data}, status=status.HTTP_201_CREATED)
+    return JsonResponse({'success': False, 'errors': role_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_role(request):
+    data = json.loads(request.body)
+    role_id = data.get('id')
+    try:
+        role = Role.objects.get(id=role_id)
+        role_serializer = RoleSerializer(role, data=data, partial=True)
+        if role_serializer.is_valid():
+            role_serializer.save()
+            return JsonResponse({'success': True, 'data': role_serializer.data}, status=status.HTTP_200_OK)
+        return JsonResponse({'success': False, 'errors': role_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    except Role.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def delete_role(request):
+    data = json.loads(request.body)
+    role_id = data.get('id')
+    try:
+        role = Role.objects.get(id=role_id)
+        role.delete()
+        return JsonResponse({'success': True, 'message': 'Role deleted successfully'}, status=status.HTTP_200_OK)
+    except Role.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)

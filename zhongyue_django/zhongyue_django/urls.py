@@ -29,7 +29,10 @@ from users.views import (
     upload_avatar,
     get_role_list,
     get_all_roles,
-    update_user_roles  # 新增
+    update_user_roles,  # 新增
+    create_role,  # 新增
+    update_role,  # 新增
+    delete_role,  # 新增
 )
 
 from django.conf import settings
@@ -50,6 +53,9 @@ urlpatterns = [
     path('role', get_role_list, name='get_role_list'),  # 新增
     path('list-all-role', get_all_roles, name='get_all_roles'),  # 新增
     path('user/update-roles', update_user_roles, name='update_user_roles'),  # 新增
+    path('role/create', create_role, name='create_role'),  # 新增
+    path('role/update', update_role, name='update_role'),  # 新增
+    path('role/delete', delete_role, name='delete_role'),  # 新增
 ]
 
 if settings.DEBUG:

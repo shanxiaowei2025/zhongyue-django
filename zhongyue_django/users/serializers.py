@@ -50,6 +50,7 @@ class RoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Role
         fields = ('id', 'name', 'code', 'status', 'remark', 'createTime', 'updateTime')
+        read_only_fields = ('id', 'createTime', 'updateTime')
 
     def get_createTime(self, obj):
         return obj.create_time.strftime('%Y-%m-%d %H:%M:%S')
