@@ -34,6 +34,12 @@ class User(AbstractUser):
             'user_permissions': self.user_permissions  # 添加 permissions 字段
         }
 
+    # 添加这两行来覆盖默认的多对多关系
+    groups = None
+    user_permissions = None
+    
+
+
 class AsyncRoute(models.Model):
     path = models.CharField(max_length=255)
     name = models.CharField(max_length=255, null=True, blank=True)

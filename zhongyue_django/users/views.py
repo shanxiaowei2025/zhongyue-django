@@ -119,7 +119,6 @@ def get_user_list(request):
         }
     })
 
-
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -148,19 +147,24 @@ def create_user(request):
         'username': data.get('username'),
         'email': data.get('email'),
         'password': data.get('password'),
+        'first_name': data.get('first_name', ''),
+        'last_name': data.get('last_name', ''),
         'nickname': data.get('nickname'),
+        'avatar': data.get('avatar', ''),
         'phone': data.get('phone'),
         'sex': data.get('sex'),
         'status': data.get('status'),
+        'dept_id': data.get('dept_id'),
         'remark': data.get('remark'),
-        'dept_id': data.get('parentId'),
-        'roles': data.get('roles', [])
+        'roles': data.get('roles', []),
+        'user_groups': data.get('user_groups', []),
+        'user_permissions': data.get('user_permissions', [])
     }
-    user_serializer = UserSerializer(data=user_data, partial=True)
+    user_serializer = UserSerializer(data=user_data)
+    
     if user_serializer.is_valid():
         user = user_serializer.save()
-        user.set_password(data['password'])
-        user.save()
+
         return JsonResponse({'success': True, 'data': user_serializer.data}, status=status.HTTP_201_CREATED)
     return JsonResponse({'success': False, 'errors': user_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -197,10 +201,13 @@ def update_user(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def delete_user(request):
+    
     data = json.loads(request.body)
     user_id = data.get('id')
     try:
         user = User.objects.get(id=user_id)
+        print('------------------------------')
+        print(user)
         user.delete()
         return JsonResponse({'success': True, 'message': 'User deleted successfully'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
