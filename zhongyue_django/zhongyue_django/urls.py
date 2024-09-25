@@ -24,7 +24,8 @@ from users.views import (
     get_role_ids,
     create_user,  # 新增
     update_user,  # 新增
-    delete_user   # 新增
+    delete_user,   # 新增
+    reset_password
 )
 
 urlpatterns = [
@@ -37,4 +38,5 @@ urlpatterns = [
     path('user/create', create_user, name='create_user'),  # 新增
     path('user/update', update_user, name='update_user'),  # 新增
     path('user/delete', delete_user, name='delete_user'),  # 新增
+    path('user/reset-password', reset_password, name='reset_password'),
 ]

@@ -212,3 +212,19 @@ def delete_user(request):
         return JsonResponse({'success': True, 'message': 'User deleted successfully'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reset_password(request):
+    data = json.loads(request.body)
+    user_id = data.get('id')
+    new_password = data.get('newPwd')
+    
+    try:
+        user = User.objects.get(id=user_id)
+        user.set_password(new_password)
+        user.save()
+        return JsonResponse({'success': True, 'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
