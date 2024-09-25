@@ -25,8 +25,12 @@ from users.views import (
     create_user,  # 新增
     update_user,  # 新增
     delete_user,   # 新增
-    reset_password
+    reset_password,
+    upload_avatar
 )
+
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -39,4 +43,8 @@ urlpatterns = [
     path('user/update', update_user, name='update_user'),  # 新增
     path('user/delete', delete_user, name='delete_user'),  # 新增
     path('user/reset-password', reset_password, name='reset_password'),
+    path('user/upload-avatar', upload_avatar, name='upload_avatar'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

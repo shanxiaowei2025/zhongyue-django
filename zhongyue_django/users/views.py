@@ -17,6 +17,12 @@ from django.core.paginator import Paginator
 import json
 from django.contrib.auth import get_user_model
 import time
+from django.core.files.base import ContentFile
+import base64
+import uuid
+import os
+from django.conf import settings
+from django.core.files.storage import default_storage
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -206,8 +212,6 @@ def delete_user(request):
     user_id = data.get('id')
     try:
         user = User.objects.get(id=user_id)
-        print('------------------------------')
-        print(user)
         user.delete()
         return JsonResponse({'success': True, 'message': 'User deleted successfully'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
@@ -228,3 +232,51 @@ def reset_password(request):
         return JsonResponse({'success': True, 'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_avatar(request):
+    if not os.path.exists(settings.MEDIA_ROOT):
+        os.makedirs(settings.MEDIA_ROOT)
+        
+    data = json.loads(request.body)
+    user_id = data.get('id')
+    avatar_data = data.get('avatar')
+    print(avatar_data)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        
+        # 解码base64图片数据
+        format, imgstr = avatar_data.split(';base64,')
+        ext = format.split('/')[-1]
+        
+        # 生成唯一的文件名
+        filename = f"{uuid.uuid4()}.{ext}"
+        
+        # 保存文件
+        data = ContentFile(base64.b64decode(imgstr))
+        file_path = default_storage.save(f'avatars/{filename}', data)
+        
+        # 更新用户的头像字段
+        full_url = request.build_absolute_uri(settings.MEDIA_URL + file_path)
+        user.avatar = full_url
+        user.save()
+        
+        return JsonResponse({
+            'success': True,
+            'data': [{
+                'avatar_url': full_url
+            }]
+        }, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'data': []
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'data': []
+        }, status=status.HTTP_400_BAD_REQUEST)
