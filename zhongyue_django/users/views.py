@@ -4,21 +4,21 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserSerializer, LoginSerializer, UserProfileSerializer
+from .serializers import UserSerializer, LoginSerializer
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.exceptions import TokenError
 import logging
-import datetime
-from .models import AsyncRoute, UserProfile, Role
+from .models import AsyncRoute
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 import json
-from django.contrib.auth.models import User  # 添加这一行
-import time  # 添加这一行
+from django.contrib.auth import get_user_model
+import time
 
+User = get_user_model()
 logger = logging.getLogger(__name__)
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -35,10 +35,10 @@ class LoginView(APIView):
                 return Response({
                     'success': True,
                     'data': {
-                        'avatar': user_data['profile']['avatar'],
+                        'avatar': user_data['avatar'],
                         'username': user_data['username'],
-                        'nickname': user_data['profile']['nickname'],
-                        'roles': user_data['profile']['roles'],
+                        'nickname': user_data['nickname'],
+                        'roles': user_data['roles'],
                         'accessToken': str(refresh.access_token),
                         'refreshToken': str(refresh),
                         'expires': refresh.access_token.payload['exp']
@@ -60,7 +60,7 @@ class RefreshTokenView(APIView):
             access_token = str(token.access_token)
             new_refresh_token = str(token)
             expires_timestamp = token.access_token.payload['exp']
-            expires = time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(expires_timestamp))  # 使用 time 模块转换时间戳
+            expires = time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(expires_timestamp))
 
             response_data = {
                 "success": True,
@@ -92,24 +92,23 @@ def get_async_routes(request):
 def get_user_list(request):
     data = json.loads(request.body)
     username = data.get('username', '')
-    status = data.get('status',1)
+    status = data.get('status', 1)
     dept_id = data.get('deptId')
     page = data.get('currentPage', 1)
     page_size = data.get('pageSize', 10)
 
-    user_profiles = UserProfile.objects.all()
+    users = User.objects.all()
     if username:
-        user_profiles = user_profiles.filter(user__username__icontains=username)
+        users = users.filter(username__icontains=username)
     if status is not None:
-        user_profiles = user_profiles.filter(status=status)
+        users = users.filter(status=status)
     if dept_id:
-        user_profiles = user_profiles.filter(dept_id=dept_id)
+        users = users.filter(dept_id=dept_id)
 
-    paginator = Paginator(user_profiles, page_size)
-    user_profiles_page = paginator.get_page(page)
+    paginator = Paginator(users, page_size)
+    users_page = paginator.get_page(page)
 
-    serializer = UserProfileSerializer(user_profiles_page, many=True)
-
+    serializer = UserSerializer(users_page, many=True)
     return JsonResponse({
         'success': True,
         'data': {
@@ -120,14 +119,6 @@ def get_user_list(request):
         }
     })
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_all_role_list(request):
-    roles = Role.objects.all()
-    return JsonResponse({
-        'success': True,
-        'data': [role.to_dict() for role in roles]
-    })
 
 @csrf_exempt
 @api_view(['POST'])
@@ -136,8 +127,8 @@ def get_role_ids(request):
     data = json.loads(request.body)
     user_id = data.get('userId')
     if user_id:
-        user_profile = UserProfile.objects.get(user_id=user_id)
-        role_ids = user_profile.roles
+        user = User.objects.get(id=user_id)
+        role_ids = user.roles
         return JsonResponse({
             'success': True,
             'data': role_ids
@@ -157,16 +148,14 @@ def create_user(request):
         'username': data.get('username'),
         'email': data.get('email'),
         'password': data.get('password'),
-        'profile': {
-            'nickname': data.get('nickname'),
-            'phone': data.get('phone'),
-            'sex': data.get('sex'),
-            'status': data.get('status'),
-            'remark': data.get('remark'),
-            'dept_id': data.get('parentId')
-        }
+        'nickname': data.get('nickname'),
+        'phone': data.get('phone'),
+        'sex': data.get('sex'),
+        'status': data.get('status'),
+        'remark': data.get('remark'),
+        'dept_id': data.get('parentId'),
+        'roles': data.get('roles', [])
     }
-    print("user_data", user_data)
     user_serializer = UserSerializer(data=user_data, partial=True)
     if user_serializer.is_valid():
         user = user_serializer.save()
@@ -189,14 +178,13 @@ def update_user(request):
     user_data = {
         'username': data.get('username'),
         'email': data.get('email'),
-        'profile': {
-            'nickname': data.get('nickname'),
-            'phone': data.get('phone'),
-            'sex': data.get('sex'),
-            'status': data.get('status'),
-            'remark': data.get('remark'),
-            'dept_id': data.get('parentId')
-        }
+        'nickname': data.get('nickname'),
+        'phone': data.get('phone'),
+        'sex': data.get('sex'),
+        'status': data.get('status'),
+        'remark': data.get('remark'),
+        'dept_id': data.get('parentId'),
+        'roles': data.get('roles', [])
     }
     
     user_serializer = UserSerializer(user, data=user_data, partial=True)
@@ -204,3 +192,16 @@ def update_user(request):
         updated_user = user_serializer.save()
         return JsonResponse({'success': True, 'data': UserSerializer(updated_user).data}, status=status.HTTP_200_OK)
     return JsonResponse({'success': False, 'errors': user_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def delete_user(request):
+    data = json.loads(request.body)
+    user_id = data.get('id')
+    try:
+        user = User.objects.get(id=user_id)
+        user.delete()
+        return JsonResponse({'success': True, 'message': 'User deleted successfully'}, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)

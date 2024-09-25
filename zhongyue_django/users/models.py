@@ -1,27 +1,7 @@
 from django.db import models
-from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-import json
-# Create your models here.
+from django.contrib.auth.models import AbstractUser
 
-class Role(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    code = models.CharField(max_length=50, unique=True)
-    status = models.IntegerField(choices=((0, '禁用'), (1, '启用')), default=1)
-    remark = models.CharField(max_length=500, blank=True)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'code': self.code,
-            'status': self.status,
-            'remark': self.remark
-        }
-
-class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+class User(AbstractUser):
     nickname = models.CharField(max_length=50, blank=True)
     avatar = models.URLField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
@@ -29,18 +9,17 @@ class UserProfile(models.Model):
     status = models.IntegerField(choices=((0, '禁用'), (1, '启用')), default=1)
     dept_id = models.IntegerField(null=True, blank=True)
     remark = models.CharField(max_length=500, blank=True)
-    roles = models.JSONField(default=list)  # 修改为 JSONField
-
-    def __str__(self):
-        return self.user.username
+    roles = models.JSONField(default=list)
+    user_groups = models.JSONField(default=list)  # 将 groups 合并到 User 模型中
+    user_permissions = models.JSONField(default=list)  # 将 permissions 合并到 User 模型中
 
     def to_dict(self):
         return {
-            'id': self.user.id,
-            'username': self.user.username,
+            'id': self.id,
+            'username': self.username,
             'nickname': self.nickname,
             'avatar': self.avatar,
-            'email': self.user.email,
+            'email': self.email,
             'phone': self.phone,
             'sex': self.sex,
             'status': self.status,
@@ -49,18 +28,11 @@ class UserProfile(models.Model):
                 'name': 'Department Name'  # 这里需要根据实际情况获取部门名称
             },
             'remark': self.remark,
-            'createTime': self.user.date_joined.timestamp() * 1000,
-            'roles': self.roles  # 直接返回 roles 列表
+            'createTime': self.date_joined.timestamp() * 1000,
+            'roles': self.roles,
+            'user_groups': self.user_groups,  # 添加 groups 字段
+            'user_permissions': self.user_permissions  # 添加 permissions 字段
         }
-
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        UserProfile.objects.create(user=instance)
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()
 
 class AsyncRoute(models.Model):
     path = models.CharField(max_length=255)
