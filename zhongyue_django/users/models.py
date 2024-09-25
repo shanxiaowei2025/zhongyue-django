@@ -63,3 +63,14 @@ class AsyncRoute(models.Model):
         if children:
             result['children'] = [child.to_dict() for child in children]
         return result
+
+class Role(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    code = models.CharField(max_length=50, unique=True)
+    status = models.IntegerField(choices=((0, '禁用'), (1, '启用')), default=1)
+    remark = models.CharField(max_length=500, blank=True)
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name

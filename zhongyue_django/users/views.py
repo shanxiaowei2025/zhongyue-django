@@ -4,12 +4,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserSerializer, LoginSerializer
+from .serializers import UserSerializer, LoginSerializer, RoleSerializer
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.exceptions import TokenError
 import logging
-from .models import AsyncRoute
+from .models import AsyncRoute, Role
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
@@ -132,17 +132,24 @@ def get_role_ids(request):
     data = json.loads(request.body)
     user_id = data.get('userId')
     if user_id:
-        user = User.objects.get(id=user_id)
-        role_ids = user.roles
-        return JsonResponse({
-            'success': True,
-            'data': role_ids
-        })
+        try:
+            user = User.objects.get(id=user_id)
+            role_names = user.roles  # 这里存储的是角色名称列表
+            
+            return JsonResponse({
+                'success': True,
+                'data': role_names
+            })
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
     else:
         return JsonResponse({
             'success': False,
-            'data': []
-        })
+            'message': 'userId is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @csrf_exempt
 @api_view(['POST'])
@@ -279,4 +286,81 @@ def upload_avatar(request):
         return JsonResponse({
             'success': False,
             'data': []
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_role_list(request):
+    data = json.loads(request.body)
+    name = data.get('name', '')
+    status = data.get('status')
+    code = data.get('code')
+    page = data.get('currentPage', 1)
+    page_size = data.get('pageSize', 10)
+
+    roles = Role.objects.all().order_by('-create_time')  # 按创建时间降序排序
+    if name:
+        roles = roles.filter(name__icontains=name)
+    if status is not None:
+        roles = roles.filter(status=status)
+    if code:
+        roles = roles.filter(code=code)
+
+    paginator = Paginator(roles, page_size)
+    roles_page = paginator.get_page(page)
+
+    serializer = RoleSerializer(roles_page, many=True)
+    return JsonResponse({
+        'success': True,
+        'data': {
+            'list': serializer.data,
+            'total': paginator.count,
+            'pageSize': page_size,
+            'currentPage': int(page)
+        }
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_roles(request):
+    roles = Role.objects.all().values('id', 'name')
+    return JsonResponse({
+        'success': True,
+        'data': list(roles)
+    })
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_user_roles(request):
+    data = json.loads(request.body)
+    user_id = data.get('userId')
+    role_ids = data.get('ids', [])  # 前端传来的角色ID列表
+
+    try:
+        user = User.objects.get(id=user_id)
+        roles = Role.objects.filter(id__in=role_ids)
+        role_names = [role.name for role in roles]
+        user.roles = role_names  # 更新用户的角色列表为角色名称
+        user.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'User roles updated successfully'
+        }, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'User not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Role.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'One or more roles not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)

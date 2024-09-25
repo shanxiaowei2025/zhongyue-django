@@ -1,11 +1,13 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from .models import Role, User  # 修改这行导入语句
 
 User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    roles = serializers.ListField(child=serializers.CharField(), required=False)
 
     class Meta:
         model = User
@@ -29,6 +31,28 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+    def validate_roles(self, value):
+        # 确保所有提供的角色名称都是有效的
+        valid_roles = set(Role.objects.values_list('name', flat=True))
+        for role_name in value:
+            if role_name not in valid_roles:
+                raise serializers.ValidationError(f"Invalid role name: {role_name}")
+        return value
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
+class RoleSerializer(serializers.ModelSerializer):
+    createTime = serializers.SerializerMethodField()
+    updateTime = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Role
+        fields = ('id', 'name', 'code', 'status', 'remark', 'createTime', 'updateTime')
+
+    def get_createTime(self, obj):
+        return obj.create_time.strftime('%Y-%m-%d %H:%M:%S')
+
+    def get_updateTime(self, obj):
+        return obj.update_time.strftime('%Y-%m-%d %H:%M:%S')
