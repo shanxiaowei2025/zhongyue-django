@@ -122,7 +122,6 @@ def get_user_list(request):
     for user in user_data:
         if 'dept' not in user or user['dept'] is None:
             user['dept'] = {'id': None, 'name': None}
-    print(user_data)
     return JsonResponse({
         'success': True,
         'data': {
