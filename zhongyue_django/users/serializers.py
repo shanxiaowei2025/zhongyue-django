@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Role, User  # 修改这行导入语句
+from .models import Role, User, Department  # 修改这行导入语句
 
 User = get_user_model()
 
@@ -57,3 +57,13 @@ class RoleSerializer(serializers.ModelSerializer):
 
     def get_updateTime(self, obj):
         return obj.update_time.strftime('%Y-%m-%d %H:%M:%S')
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    parent_id = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), source='parent', allow_null=True)
+
+    class Meta:
+        model = Department
+        fields = ('id', 'name', 'parent_id', 'sort', 'phone', 'principal', 'email', 'status', 'type', 'create_time', 'remark')
+        extra_kwargs = {
+            'parent_id': {'allow_null': True}
+        }

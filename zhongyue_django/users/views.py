@@ -4,12 +4,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserSerializer, LoginSerializer, RoleSerializer
+from .serializers import UserSerializer, LoginSerializer, RoleSerializer, DepartmentSerializer  
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.exceptions import TokenError
 import logging
-from .models import AsyncRoute, Role
+from .models import AsyncRoute, Role, Department
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
@@ -23,6 +23,7 @@ import uuid
 import os
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.utils import timezone
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -415,3 +416,110 @@ def delete_role(request):
         return JsonResponse({'success': True, 'message': 'Role deleted successfully'}, status=status.HTTP_200_OK)
     except Role.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+def convert_to_frontend_format(data):
+    """将后端字段名转换为前端所需的格式"""
+    field_mapping = {
+        'parent_id': 'parentId',
+        'create_time': 'createTime'
+    }
+    if isinstance(data, list):
+        return [convert_to_frontend_format(item) for item in data]
+    elif isinstance(data, dict):
+        result = {}
+        for key, value in data.items():
+            new_key = field_mapping.get(key, key)
+            if new_key == 'createTime':
+                if isinstance(value, str):
+                    value = timezone.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                value = int(value.timestamp() * 1000) if value else None
+            elif new_key == 'parentId':
+                value = value or 0  # 如果 parent_id 为 None，则设置为 0
+            result[new_key] = value
+        return result
+    return data
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_dept_list(request):
+    departments = Department.objects.all()
+    serializer = DepartmentSerializer(departments, many=True)
+    converted_data = convert_to_frontend_format(serializer.data)
+    return JsonResponse({
+        'success': True,
+        'data': converted_data
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_dept(request):
+    data = json.loads(request.body)
+    parent_id = data.get('parentId')
+    if parent_id == 0:
+        parent_id = None
+    
+    backend_data = {
+        'parent_id': parent_id,
+        'name': data.get('name'),
+        'sort': data.get('sort'),
+        'phone': data.get('phone'),
+        'principal': data.get('principal'),
+        'email': data.get('email'),
+        'status': data.get('status'),
+        'type': data.get('type', 3),
+        'remark': data.get('remark')
+    }
+    serializer = DepartmentSerializer(data=backend_data)
+    if serializer.is_valid():
+        serializer.save()
+        converted_data = convert_to_frontend_format(serializer.data)
+        return JsonResponse({'success': True, 'data': converted_data}, status=status.HTTP_201_CREATED)
+    return JsonResponse({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_dept(request):
+    data = json.loads(request.body)
+    dept_id = data.get('id')
+    
+    if dept_id is None:
+        return JsonResponse({'success': False, 'message': 'Department ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        department = Department.objects.get(id=dept_id)
+        
+        # 提取需要更新的字段
+        backend_data = {
+            'parent_id': data.get('parentId'),
+            'name': data.get('name'),
+            'sort': data.get('sort'),
+            'phone': data.get('phone'),
+            'principal': data.get('principal'),
+            'email': data.get('email'),
+            'status': data.get('status'),
+            'type': data.get('type', department.type),  # 如果没有提供，保持原来的值
+            'remark': data.get('remark')
+        }
+        
+        # 如果 parentId 为 0，将其设置为 None（表示顶级部门）
+        if backend_data['parent_id'] == 0:
+            backend_data['parent_id'] = None
+        
+        serializer = DepartmentSerializer(department, data=backend_data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            converted_data = convert_to_frontend_format(serializer.data)
+            return JsonResponse({'success': True, 'data': converted_data}, status=status.HTTP_200_OK)
+        return JsonResponse({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    except Department.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Department not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def delete_dept(request):
+    dept_id = json.loads(request.body)
+
+    try:
+        department = Department.objects.get(id=dept_id)
+        department.delete()
+        return JsonResponse({'success': True, 'message': 'Department deleted successfully'}, status=status.HTTP_200_OK)
+    except Department.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Department not found'}, status=status.HTTP_404_NOT_FOUND)
