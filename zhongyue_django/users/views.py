@@ -107,7 +107,7 @@ def get_user_list(request):
     users = User.objects.all()
     if username:
         users = users.filter(username__icontains=username)
-    if status != '':
+    if status is not None:
         users = users.filter(status=status)
     if dept_id:
         users = users.filter(dept_id=dept_id)
@@ -116,10 +116,17 @@ def get_user_list(request):
     users_page = paginator.get_page(page)
 
     serializer = UserSerializer(users_page, many=True)
+    user_data = serializer.data
+    
+    # 确保每个用户都有 dept 字段，即使它可能为空
+    for user in user_data:
+        if 'dept' not in user or user['dept'] is None:
+            user['dept'] = {'id': None, 'name': None}
+    print(user_data)
     return JsonResponse({
         'success': True,
         'data': {
-            'list': serializer.data,
+            'list': user_data,
             'total': paginator.count,
             'pageSize': page_size,
             'currentPage': page
@@ -196,22 +203,22 @@ def update_user(request):
     except User.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     
-    user_data = {
-        'username': data.get('username'),
-        'email': data.get('email'),
-        'nickname': data.get('nickname'),
-        'phone': data.get('phone'),
-        'sex': data.get('sex'),
-        'status': data.get('status'),
-        'remark': data.get('remark'),
-        'dept_id': data.get('parentId'),
-        'roles': data.get('roles', [])
-    }
+    # 只更新提供的字段
+    user_data = {}
+    for field in ['username', 'email', 'nickname', 'phone', 'sex', 'status', 'remark', 'dept_id', 'roles']:
+        if field in data:
+            user_data[field] = data[field]
+    
+    # 特殊处理 parentId，如果存在则映射到 dept_id
+    if 'parentId' in data:
+        user_data['dept_id'] = data['parentId']
     
     user_serializer = UserSerializer(user, data=user_data, partial=True)
     if user_serializer.is_valid():
         updated_user = user_serializer.save()
         return JsonResponse({'success': True, 'data': UserSerializer(updated_user).data}, status=status.HTTP_200_OK)
+    
+    print("Serializer errors:", user_serializer.errors)  # 打印序列化器错误，用于调试
     return JsonResponse({'success': False, 'errors': user_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 @csrf_exempt
@@ -302,6 +309,8 @@ def get_role_list(request):
     code = data.get('code')
     page = data.get('currentPage', 1)
     page_size = data.get('pageSize', 10)
+
+    
 
     roles = Role.objects.all().order_by('-create_time')  # 按创建时间降序排序
     if name:

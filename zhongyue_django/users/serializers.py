@@ -5,14 +5,45 @@ from .models import Role, User, Department  # 修改这行导入语句
 User = get_user_model()
 
 
+
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     roles = serializers.ListField(child=serializers.CharField(), required=False)
+    dept = serializers.SerializerMethodField()
+    createTime = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'nickname', 'avatar', 'phone', 'sex', 'status', 'dept_id', 'remark', 'roles', 'user_groups', 'user_permissions', 'date_joined', 'password')
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ('id', 'username', 'email', 'nickname', 'avatar', 'phone', 'sex', 'status', 'dept', 'remark', 'createTime', 'roles', 'password', 'dept_id')
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'username': {'required': False},
+            'email': {'required': False},
+            'nickname': {'required': False},
+            'avatar': {'required': False},
+            'phone': {'required': False},
+            'sex': {'required': False},
+            'status': {'required': False},
+            'remark': {'required': False},
+            'dept_id': {'required': False},
+        }
+
+    def get_createTime(self, obj):
+        return int(obj.date_joined.timestamp() * 1000)
+
+    def get_dept(self, obj):
+        if obj.dept_id:
+            try:
+                department = Department.objects.get(id=obj.dept_id)
+                return {'id': department.id, 'name': department.name}
+            except Department.DoesNotExist:
+                pass
+        return {'id': None, 'name': None}
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['dept'] = self.get_dept(instance)
+        return ret
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
