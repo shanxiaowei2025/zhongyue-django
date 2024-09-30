@@ -53,8 +53,8 @@ class AsyncRoute(models.Model):
         result = {
             'path': self.path,
             'name': self.name,
-            'component': self.component,
-            'redirect': self.redirect,
+            'component': self.component if self.component else None,
+            'redirect': self.redirect if self.redirect else None,
             'meta': self.meta,
         }
         children = self.asyncroute_set.all()
