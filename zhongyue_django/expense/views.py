@@ -1,11 +1,14 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.paginator import Paginator
 from .models import Expense
 from .serializers import ExpenseSerializer
 import json
+from django.core.files.base import ContentFile
+import base64
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -38,8 +41,30 @@ def get_expense_list(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
 def create_expense(request):
-    serializer = ExpenseSerializer(data=request.data, context={'request': request})
+    data = request.data.copy()
+
+    # 处理合同图片
+    contract_image = request.FILES.get('contractImage')
+    if contract_image:
+        data['contract_image'] = contract_image
+
+    # 处理收费凭证
+    proof_of_charge = request.FILES.get('proofOfCharge')
+    if proof_of_charge:
+        data['proof_of_charge'] = proof_of_charge
+
+    # 处理日期字段
+    date_fields = ['agency_start_date', 'agency_end_date', 'invoice_software_start_date', 
+                   'invoice_software_end_date', 'social_insurance_start_date', 'social_insurance_end_date', 
+                   'statistical_start_date', 'statistical_end_date', 'charge_date']
+    for field in date_fields:
+        if field in data and data[field]:
+            if '-' not in data[field]:
+                data[field] += '-01'  # 添加日期，如果只有年月
+
+    serializer = ExpenseSerializer(data=data)
     if serializer.is_valid():
         serializer.save()
         return Response({'success': True, 'data': serializer.data}, status=status.HTTP_201_CREATED)
