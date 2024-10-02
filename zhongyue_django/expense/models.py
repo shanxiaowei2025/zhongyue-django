@@ -24,7 +24,7 @@ class Expense(models.Model):
     invoice_software_start_date = models.DateField(verbose_name='开票软件开始日期', db_comment='开票软件开始日期', null=True, blank=True)
     invoice_software_end_date = models.DateField(verbose_name='开票软件结束日期', db_comment='开票软件结束日期', null=True, blank=True)
     insurance_types = models.CharField(max_length=255, verbose_name='参保险种', db_comment='参保险种', null=True, blank=True)
-    insured_count = models.IntegerField(verbose_name='参保人数', db_comment='参保人数', default=0)
+    insured_count = models.IntegerField(verbose_name='参保人数', db_comment='参保人数', null=True, blank=True)
     social_insurance_agency_fee = models.IntegerField(verbose_name='社保代理费', db_comment='社保代理费', null=True, blank=True)
     social_insurance_start_date = models.DateField(verbose_name='社保开始日期', db_comment='社保开始日期', null=True, blank=True)
     social_insurance_end_date = models.DateField(verbose_name='社保结束日期', db_comment='社保结束日期', null=True, blank=True)
