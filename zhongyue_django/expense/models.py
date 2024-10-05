@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import MaxLengthValidator
 
 class Expense(models.Model):
     company_name = models.CharField(max_length=255, verbose_name='企业名称', db_comment='企业名称', null=True, blank=True)
@@ -37,7 +38,14 @@ class Expense(models.Model):
     administrative_license_fee = models.IntegerField(verbose_name='行政许可收费', db_comment='行政许可收费', null=True, blank=True)
     other_business = models.CharField(max_length=255, verbose_name='其他业务', db_comment='其他业务', null=True, blank=True)
     other_business_fee = models.IntegerField(verbose_name='其他业务收费', db_comment='其他业务收费', null=True, blank=True)
-    proof_of_charge = models.CharField(max_length=255, null=True, blank=True, verbose_name='收费凭证', db_comment='收费凭证')
+    proof_of_charge = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        validators=[MaxLengthValidator(3)],
+        verbose_name='收费凭证',
+        help_text='收费凭证（最多3张）'
+    )
     total_fee = models.IntegerField(verbose_name='总费用', db_comment='总费用', null=True, blank=True)
     submitter = models.CharField(max_length=100, verbose_name='提交人', db_comment='提交人', null=True, blank=True)
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建日期', db_comment='创建日期')

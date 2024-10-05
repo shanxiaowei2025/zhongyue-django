@@ -1,7 +1,14 @@
 from rest_framework import serializers
 from .models import Expense
+import json
 
 class ExpenseSerializer(serializers.ModelSerializer):
+    proof_of_charge = serializers.ListField(
+        child=serializers.URLField(),
+        max_length=3,
+        required=False
+    )
+
     class Meta:
         model = Expense
         fields = '__all__'
@@ -42,3 +49,22 @@ class ExpenseSerializer(serializers.ModelSerializer):
         validated_data['total_fee'] = total_fee if total_fee > 0 else None
 
         return super().update(instance, validated_data)
+
+    def validate_proof_of_charge(self, value):
+        if len(value) > 3:
+            raise serializers.ValidationError("最多只能上传3张收费凭证。")
+        return value
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if isinstance(representation['proof_of_charge'], str):
+            try:
+                representation['proof_of_charge'] = json.loads(representation['proof_of_charge'])
+            except json.JSONDecodeError:
+                representation['proof_of_charge'] = []
+        return representation
+
+    def validate_contract_image(self, value):
+        if isinstance(value, dict):
+            return value.get('url', '')
+        return value

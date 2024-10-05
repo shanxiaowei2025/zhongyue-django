@@ -12,6 +12,7 @@ from calendar import monthrange
 from django.conf import settings
 import os
 from urllib.parse import urljoin
+from django.core.files.storage import default_storage
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -47,7 +48,12 @@ def get_expense_list(request):
 @parser_classes([MultiPartParser, FormParser])
 def create_expense(request):
     data = request.data.copy()
-
+    converted_data = {}
+    
+    # 处理 contract_image
+    if 'contractImage' in data and isinstance(data['contractImage'], dict):
+        data['contract_image'] = data['contractImage'].get('url', '')
+    
     # 字段名称映射
     field_mapping = {
         'accountingSoftwareFee': 'accounting_software_fee',
@@ -101,7 +107,6 @@ def create_expense(request):
     reverse_field_mapping = {v: k for k, v in field_mapping.items()}
 
     # 转换字段名称
-    converted_data = {}
     for key, value in data.items():
         converted_key = field_mapping.get(key, key)
         converted_data[converted_key] = value
@@ -182,6 +187,23 @@ def create_expense(request):
         else:
             converted_data['charge_date'] = None
 
+    # 处理收费凭证
+    proof_of_charge_urls = []
+    for i in range(3):  # 最多处理3个文件
+        file_key = f'proofOfCharge_{i}'
+        if file_key in request.FILES:
+            file = request.FILES[file_key]
+            filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.name}"
+            file_path = os.path.join('proof_of_charge', filename)
+            full_path = default_storage.save(file_path, file)
+            file_url = request.build_absolute_uri(settings.MEDIA_URL + full_path)
+            proof_of_charge_urls.append(file_url)
+        elif file_key in data and data[file_key]:
+            # 如果是已存在的URL，直接添加
+            proof_of_charge_urls.append(data[file_key])
+
+    converted_data['proof_of_charge'] = proof_of_charge_urls
+
     serializer = ExpenseSerializer(data=converted_data)
     if serializer.is_valid():
         serializer.save()
@@ -196,7 +218,8 @@ def update_expense(request):
     try:
         expense = Expense.objects.get(id=expense_id)
         data = request.data.copy()
-
+        converted_data = {}
+        
         # 字段名称映射
         field_mapping = {
             'accountingSoftwareFee': 'accounting_software_fee',
@@ -250,7 +273,6 @@ def update_expense(request):
         reverse_field_mapping = {v: k for k, v in field_mapping.items()}
 
         # 转换字段名称
-        converted_data = {}
         for key, value in data.items():
             converted_key = field_mapping.get(key, key)
             converted_data[converted_key] = value
@@ -336,6 +358,24 @@ def update_expense(request):
             else:
                 converted_data['charge_date'] = None
 
+        # 处理收费凭证
+        proof_of_charge_urls = []
+        for i in range(3):  # 最多处理3个文件
+            file_key = f'proofOfCharge_{i}'
+            if file_key in request.FILES:
+                file = request.FILES[file_key]
+                filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.name}"
+                file_path = os.path.join('proof_of_charge', filename)
+                full_path = default_storage.save(file_path, file)
+                file_url = request.build_absolute_uri(settings.MEDIA_URL + full_path)
+                proof_of_charge_urls.append(file_url)
+            elif file_key in data and data[file_key]:
+                # 如果是已存在的URL，直接添加
+                proof_of_charge_urls.append(data[file_key])
+
+        if proof_of_charge_urls:
+            converted_data['proof_of_charge'] = proof_of_charge_urls
+        
         serializer = ExpenseSerializer(expense, data=converted_data, partial=True)
         if serializer.is_valid():
             serializer.save()
