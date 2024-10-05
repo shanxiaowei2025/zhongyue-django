@@ -151,14 +151,22 @@ def create_expense(request):
         if not date_str:
             return None
         try:
-            year, month = map(int, date_str.split('-'))
-            if is_end_date:
-                _, last_day = monthrange(year, month)
-                return date(year, month, last_day)
-            else:
-                return date(year, month, 1)
+            # 尝试解析完整的日期格式 (YYYY-MM-DD)
+            parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            return None
+            try:
+                # 如果失败，尝试解析年月格式 (YYYY-MM)
+                year, month = map(int, date_str.split('-'))
+                if is_end_date:
+                    _, last_day = monthrange(year, month)
+                    parsed_date = date(year, month, last_day)
+                else:
+                    parsed_date = date(year, month, 1)
+            except ValueError:
+                # 如果两种格式都解析失败，返回 None
+                return None
+        
+        return parsed_date
 
     for field in start_date_fields + end_date_fields:
         if field in converted_data:
@@ -166,11 +174,12 @@ def create_expense(request):
             processed_date = process_date(converted_data[field], is_end_date)
             converted_data[field] = processed_date
 
-    # 特殊处理 charge_date，因为它需要完整的日期
+    # 特殊处理 charge_date，因为它总是需要完整的日期
     if 'charge_date' in converted_data and converted_data['charge_date']:
-        try:
-            converted_data['charge_date'] = datetime.strptime(converted_data['charge_date'], "%Y-%m-%d").date()
-        except ValueError:
+        processed_date = process_date(converted_data['charge_date'])
+        if processed_date:
+            converted_data['charge_date'] = processed_date
+        else:
             converted_data['charge_date'] = None
 
     serializer = ExpenseSerializer(data=converted_data)
@@ -296,14 +305,22 @@ def update_expense(request):
             if not date_str:
                 return None
             try:
-                year, month = map(int, date_str.split('-'))
-                if is_end_date:
-                    _, last_day = monthrange(year, month)
-                    return date(year, month, last_day)
-                else:
-                    return date(year, month, 1)
+                # 尝试解析完整的日期格式 (YYYY-MM-DD)
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
-                return None
+                try:
+                    # 如果失败，尝试解析年月格式 (YYYY-MM)
+                    year, month = map(int, date_str.split('-'))
+                    if is_end_date:
+                        _, last_day = monthrange(year, month)
+                        parsed_date = date(year, month, last_day)
+                    else:
+                        parsed_date = date(year, month, 1)
+                except ValueError:
+                    # 如果两种格式都解析失败，返回 None
+                    return None
+            
+            return parsed_date
 
         for field in start_date_fields + end_date_fields:
             if field in converted_data:
@@ -311,11 +328,12 @@ def update_expense(request):
                 processed_date = process_date(converted_data[field], is_end_date)
                 converted_data[field] = processed_date
 
-        # 特殊处理 charge_date，因为它需要完整的日期
+        # 特殊处理 charge_date，因为它总是需要完整的日期
         if 'charge_date' in converted_data and converted_data['charge_date']:
-            try:
-                converted_data['charge_date'] = datetime.strptime(converted_data['charge_date'], "%Y-%m-%d").date()
-            except ValueError:
+            processed_date = process_date(converted_data['charge_date'])
+            if processed_date:
+                converted_data['charge_date'] = processed_date
+            else:
                 converted_data['charge_date'] = None
 
         serializer = ExpenseSerializer(expense, data=converted_data, partial=True)
