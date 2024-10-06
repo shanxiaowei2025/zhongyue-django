@@ -13,6 +13,28 @@ from django.conf import settings
 import os
 from urllib.parse import urljoin
 from django.core.files.storage import default_storage
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.viewsets import ModelViewSet
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+class ExpenseViewSet(ModelViewSet):
+    queryset = Expense.objects.all().order_by('-id')
+    serializer_class = ExpenseSerializer
+    pagination_class = StandardResultsSetPagination
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -20,14 +42,22 @@ def get_expense_list(request):
     data = json.loads(request.body)
     company_name = data.get('companyName', '')
     status = data.get('status')
-    page = data.get('currentPage', 1)
-    page_size = data.get('pageSize', 10)
+    submitter = data.get('submitter', '')
+    charge_date_start = data.get('chargeDateStart')
+    charge_date_end = data.get('chargeDateEnd')
+    page = data.get('page', 1)
+    page_size = data.get('page_size', 10)
 
     expenses = Expense.objects.all().order_by('-create_time')
+    
     if company_name:
         expenses = expenses.filter(company_name__icontains=company_name)
     if status is not None:
         expenses = expenses.filter(status=status)
+    if submitter:
+        expenses = expenses.filter(submitter__icontains=submitter)
+    if charge_date_start and charge_date_end:
+        expenses = expenses.filter(charge_date__range=[charge_date_start, charge_date_end])
 
     paginator = Paginator(expenses, page_size)
     expenses_page = paginator.get_page(page)
@@ -394,3 +424,21 @@ def delete_expense(request):
         return Response({'success': True, 'message': 'Expense deleted successfully'}, status=status.HTTP_200_OK)
     except Expense.DoesNotExist:
         return Response({'success': False, 'message': 'Expense not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_company_names(request):
+    company_names = Expense.objects.values_list('company_name', flat=True).distinct()
+    return Response({
+        'success': True,
+        'data': list(company_names)
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_submitters(request):
+    submitters = Expense.objects.values_list('submitter', flat=True).distinct()
+    return Response({
+        'success': True,
+        'data': list(submitters)
+    })
