@@ -531,3 +531,15 @@ def delete_dept(request):
         return JsonResponse({'success': True, 'message': 'Department deleted successfully'}, status=status.HTTP_200_OK)
     except Department.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Department not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_roles(request):
+    user = request.user
+    roles = user.roles
+    return Response({
+        'success': True,
+        'data': {
+            'roles': roles
+        }
+    })
