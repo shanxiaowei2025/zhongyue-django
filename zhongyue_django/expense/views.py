@@ -6,6 +6,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.paginator import Paginator
 from .models import Expense
 from .serializers import ExpenseSerializer
+from .permissions import get_user_permissions
 import json
 from datetime import datetime, date
 from calendar import monthrange
@@ -15,6 +16,9 @@ from urllib.parse import urljoin
 from django.core.files.storage import default_storage
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
+from django.contrib.auth.models import Group
+from users.models import User
+from django.db.models import Q
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
@@ -36,40 +40,60 @@ class ExpenseViewSet(ModelViewSet):
 
         return Response(serializer.data)
 
-@api_view(['POST'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_expense_list(request):
-    data = json.loads(request.body)
-    company_name = data.get('companyName', '')
-    status = data.get('status')
-    submitter = data.get('submitter', '')
-    charge_date_start = data.get('chargeDateStart')
-    charge_date_end = data.get('chargeDateEnd')
-    page = data.get('page', 1)
-    page_size = data.get('page_size', 10)
-
-    expenses = Expense.objects.all().order_by('-create_time')
+    user = request.user
+    user_permissions = get_user_permissions(user)
     
+    # 获取查询参数
+    company_name = request.query_params.get('companyName')
+    status = request.query_params.get('status')
+    submitter = request.query_params.get('submitter')
+    charge_date_start = request.query_params.get('chargeDateStart')
+    charge_date_end = request.query_params.get('chargeDateEnd')
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 10))
+
+    queryset = Expense.objects.all()
+
+    # 基于用户权限过滤数据
+    if not user_permissions['data']['viewAll']:
+        if user_permissions['data']['viewOwn']:
+            queryset = queryset.filter(submitter=user.username)
+        if user_permissions['data']['viewByLocation']:
+            queryset = queryset.filter(company_location=user_permissions['data']['viewByLocation'])
+        if user_permissions['data']['viewDepartmentSubmissions']:
+            department_users = User.objects.filter(dept_id=user.dept_id).values_list('username', flat=True)
+            queryset = queryset.filter(submitter__in=department_users)
+
+    # 应用搜索过滤
     if company_name:
-        expenses = expenses.filter(company_name__icontains=company_name)
-    if status is not None:
-        expenses = expenses.filter(status=status)
+        queryset = queryset.filter(company_name__icontains=company_name)
+    if status != '':
+        queryset = queryset.filter(status=status)
     if submitter:
-        expenses = expenses.filter(submitter__icontains=submitter)
+        queryset = queryset.filter(submitter__icontains=submitter)
     if charge_date_start and charge_date_end:
-        expenses = expenses.filter(charge_date__range=[charge_date_start, charge_date_end])
+        queryset = queryset.filter(charge_date__range=[charge_date_start, charge_date_end])
 
-    paginator = Paginator(expenses, page_size)
-    expenses_page = paginator.get_page(page)
+    # 排序
+    queryset = queryset.order_by('-id')
 
-    serializer = ExpenseSerializer(expenses_page, many=True)
+    # 分页
+    paginator = Paginator(queryset, page_size)
+    expenses = paginator.get_page(page)
+
+    serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
+
     return Response({
         'success': True,
         'data': {
             'list': serializer.data,
             'total': paginator.count,
+            'currentPage': page,
             'pageSize': page_size,
-            'currentPage': int(page)
+            'permissions': user_permissions
         }
     })
 

@@ -38,6 +38,9 @@ class User(AbstractUser):
     groups = None
     user_permissions = None
 
+    def has_role(self, role_name):
+        return role_name in self.roles
+
 class AsyncRoute(models.Model):
     path = models.CharField(max_length=255, default='', verbose_name='路由路径', db_comment='异步路由路径')
     name = models.CharField(max_length=255, null=True, blank=True, default=None, verbose_name='路由名称', db_comment='异步路由名称')
