@@ -53,7 +53,8 @@ class Expense(models.Model):
     charge_method = models.CharField(max_length=100, verbose_name='收费方式', db_comment='收费方式', null=True, blank=True)
     auditor = models.CharField(max_length=100, verbose_name='审核员', db_comment='审核员', null=True, blank=True)
     audit_date = models.DateField(null=True, blank=True, verbose_name='审核日期', db_comment='审核日期')
-    status = models.IntegerField(choices=((0, '未审核'), (1, '已审核')), default=0, verbose_name='状态', db_comment='状态：0-未审核，1-已审核')
+    status = models.IntegerField(choices=((0, '未审核'), (1, '已审核'), (2, '已拒绝')), default=0, verbose_name='状态', db_comment='状态：0-未审核，1-已审核，2-已拒绝')
+    reject_reason = models.TextField(blank=True, null=True, verbose_name='拒绝原因', db_comment='审核拒绝原因')
     remarks = models.TextField(blank=True, verbose_name='备注', db_comment='备注信息')
 
     def __str__(self):

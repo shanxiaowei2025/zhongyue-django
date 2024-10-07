@@ -8,4 +8,5 @@ urlpatterns = [
     path('delete', views.delete_expense, name='delete_expense'),
     path('company-names', views.get_company_names, name='get_company_names'),
     path('submitters', views.get_submitters, name='get_submitters'),
+    path('audit', views.audit_expense, name='audit_expense'),
 ]

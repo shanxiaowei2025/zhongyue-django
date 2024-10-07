@@ -466,3 +466,24 @@ def get_submitters(request):
         'success': True,
         'data': list(submitters)
     })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def audit_expense(request):
+    expense_id = request.data.get('id')
+    audit_status = request.data.get('status')
+    reject_reason = request.data.get('reject_reason')
+
+    try:
+        expense = Expense.objects.get(id=expense_id)
+        expense.status = audit_status
+        expense.auditor = request.user.username
+        expense.audit_date = date.today()
+
+        if audit_status == 2:  # 审核拒绝
+            expense.reject_reason = reject_reason
+
+        expense.save()
+        return Response({'success': True, 'message': '审核成功'}, status=status.HTTP_200_OK)
+    except Expense.DoesNotExist:
+        return Response({'success': False, 'message': '费用记录不存在'}, status=status.HTTP_404_NOT_FOUND)
