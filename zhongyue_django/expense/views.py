@@ -44,7 +44,8 @@ class ExpenseViewSet(ModelViewSet):
 @permission_classes([IsAuthenticated])
 def get_expense_list(request):
     user = request.user
-    user_permissions = get_user_permissions(user)
+    current_role = request.query_params.get('current_role', 'default')
+    user_permissions = get_user_permissions(user, current_role)
     
     # 获取查询参数
     company_name = request.query_params.get('companyName')
@@ -59,13 +60,22 @@ def get_expense_list(request):
 
     # 基于用户权限过滤数据
     if not user_permissions['data']['viewAll']:
+        filters = Q()
+        
         if user_permissions['data']['viewOwn']:
-            queryset = queryset.filter(submitter=user.username)
+            filters |= Q(submitter=user.username)
+        
         if user_permissions['data']['viewByLocation']:
-            queryset = queryset.filter(company_location=user_permissions['data']['viewByLocation'])
+            filters |= Q(company_location=user_permissions['data']['viewByLocation'])
+        
         if user_permissions['data']['viewDepartmentSubmissions']:
             department_users = User.objects.filter(dept_id=user.dept_id).values_list('username', flat=True)
-            queryset = queryset.filter(submitter__in=department_users)
+            filters |= Q(submitter__in=department_users)
+        
+        if user_permissions['data']['viewUnaudited']:
+            filters |= Q(status=0)
+        
+        queryset = queryset.filter(filters)
 
     # 应用搜索过滤
     if company_name:
