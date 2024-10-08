@@ -487,3 +487,22 @@ def audit_expense(request):
         return Response({'success': True, 'message': '审核成功'}, status=status.HTTP_200_OK)
     except Expense.DoesNotExist:
         return Response({'success': False, 'message': '费用记录不存在'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cancel_audit_expense(request):
+    print(request.data)
+    expense_id = request.data.get('id')
+    if not expense_id:
+        return Response({'success': False, 'message': '未提供有效的费用记录ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        expense = Expense.objects.get(id=expense_id)
+        expense.status = 0  # 设置状态为未审核
+        expense.auditor = None
+        expense.audit_date = None
+        expense.reject_reason = None
+        expense.save()
+        return Response({'success': True, 'message': '取消审核成功'}, status=status.HTTP_200_OK)
+    except Expense.DoesNotExist:
+        return Response({'success': False, 'message': '费用记录不存在'}, status=status.HTTP_404_NOT_FOUND)
