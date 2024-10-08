@@ -113,11 +113,7 @@ def get_expense_list(request):
 def create_expense(request):
     data = request.data.copy()
     converted_data = {}
-    
-    # 处理 contract_image
-    if 'contractImage' in data and isinstance(data['contractImage'], dict):
-        data['contract_image'] = data['contractImage'].get('url', '')
-    
+    print(data)
     # 字段名称映射
     field_mapping = {
         'accountingSoftwareFee': 'accounting_software_fee',
