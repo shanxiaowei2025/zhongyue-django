@@ -44,6 +44,7 @@ class ExpenseViewSet(ModelViewSet):
 @permission_classes([IsAuthenticated])
 def get_expense_list(request):
     user = request.user
+    print(request.query_params)
     current_role = request.query_params.get('current_role', 'default')
     user_permissions = get_user_permissions(user, current_role)
     
@@ -95,7 +96,7 @@ def get_expense_list(request):
     expenses = paginator.get_page(page)
 
     serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
-
+    print(serializer.data)
     return Response({
         'success': True,
         'data': {
