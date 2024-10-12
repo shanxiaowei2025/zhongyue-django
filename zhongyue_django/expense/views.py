@@ -19,6 +19,9 @@ from rest_framework.viewsets import ModelViewSet
 from django.contrib.auth.models import Group
 from users.models import User
 from django.db.models import Q
+import csv
+from django.http import HttpResponse
+from django.utils import timezone
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
@@ -40,26 +43,9 @@ class ExpenseViewSet(ModelViewSet):
 
         return Response(serializer.data)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_expense_list(request):
-    user = request.user
-    print(request.query_params)
-    current_role = request.query_params.get('current_role', 'default')
+def apply_permission_filters(queryset, user, current_role):
     user_permissions = get_user_permissions(user, current_role)
     
-    # 获取查询参数
-    company_name = request.query_params.get('companyName')
-    status = request.query_params.get('status')
-    submitter = request.query_params.get('submitter')
-    charge_date_start = request.query_params.get('chargeDateStart')
-    charge_date_end = request.query_params.get('chargeDateEnd')
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 10))
-
-    queryset = Expense.objects.all()
-
-    # 基于用户权限过滤数据
     if not user_permissions['data']['viewAll']:
         filters = Q()
         
@@ -77,6 +63,26 @@ def get_expense_list(request):
             filters |= Q(status=0)
         
         queryset = queryset.filter(filters)
+    
+    return queryset,user_permissions
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_expense_list(request):
+    user = request.user
+    current_role = request.query_params.get('current_role', 'default')
+    
+    queryset = Expense.objects.all()
+    queryset,user_permissions = apply_permission_filters(queryset, user, current_role)
+    
+    # 获取查询参数
+    company_name = request.query_params.get('companyName')
+    status = request.query_params.get('status')
+    submitter = request.query_params.get('submitter')
+    charge_date_start = request.query_params.get('chargeDateStart')
+    charge_date_end = request.query_params.get('chargeDateEnd')
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 10))
 
     # 应用搜索过滤
     if company_name:
@@ -96,7 +102,6 @@ def get_expense_list(request):
     expenses = paginator.get_page(page)
 
     serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
-    print(serializer.data)
     return Response({
         'success': True,
         'data': {
@@ -114,7 +119,6 @@ def get_expense_list(request):
 def create_expense(request):
     data = request.data.copy()
     converted_data = {}
-    print(data)
     # 字段名称映射
     field_mapping = {
         'accountingSoftwareFee': 'accounting_software_fee',
@@ -498,7 +502,6 @@ def audit_expense(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def cancel_audit_expense(request):
-    print(request.data)
     expense_id = request.data.get('id')
     if not expense_id:
         return Response({'success': False, 'message': '未提供有效的费用记录ID'}, status=status.HTTP_400_BAD_REQUEST)
@@ -513,3 +516,46 @@ def cancel_audit_expense(request):
         return Response({'success': True, 'message': '取消审核成功'}, status=status.HTTP_200_OK)
     except Expense.DoesNotExist:
         return Response({'success': False, 'message': '费用记录不存在'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_expenses(request):
+    user = request.user
+    current_role = request.query_params.get('current_role', 'default')
+    
+    queryset = Expense.objects.all()
+    queryset, user_permissions = apply_permission_filters(queryset, user, current_role)
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="expenses.csv"'
+    
+    response.write(u'\ufeff'.encode('utf-8'))
+
+    writer = csv.writer(response)
+    writer.writerow(['企业名称', '企业类型', '企业归属地', '办照类型', '办照费用', '一次性地址费', '牌子费', '刻章费',
+                     '代理类型', '代理费', '记账软件费', '地址费', '代理开始日期', '代理结束日期', '业务类型', '合同类型',
+                     '开票软件服务商', '开票软件费', '开票软件开始日期', '开票软件结束日期', '参保险种', '参保人数',
+                     '社保代理费', '社保开始日期', '社保结束日期', '统计局报表费', '统计开始日期', '统计结束日期',
+                     '变更业务', '变更收费', '行政许可', '行政许可收费', '其他业务', '其他业务收费', '总费用',
+                     '提交人', '创建日期', '收费日期', '收费方式', '审核员', '审核日期', '状态', '备注'])
+
+    for expense in queryset:
+        # 格式化创建日期到秒级别
+        create_time = expense.create_time.strftime('%Y-%m-%d %H:%M:%S') if expense.create_time else ''
+        
+        writer.writerow([
+            expense.company_name, expense.company_type, expense.company_location, expense.license_type,
+            expense.license_fee, expense.one_time_address_fee, expense.brand_fee, expense.seal_fee,
+            expense.agency_type, expense.agency_fee, expense.accounting_software_fee, expense.address_fee,
+            expense.agency_start_date, expense.agency_end_date, expense.business_type, expense.contract_type,
+            expense.invoice_software_provider, expense.invoice_software_fee, expense.invoice_software_start_date,
+            expense.invoice_software_end_date, expense.insurance_types, expense.insured_count,
+            expense.social_insurance_agency_fee, expense.social_insurance_start_date, expense.social_insurance_end_date,
+            expense.statistical_report_fee, expense.statistical_start_date, expense.statistical_end_date,
+            expense.change_business, expense.change_fee, expense.administrative_license, expense.administrative_license_fee,
+            expense.other_business, expense.other_business_fee, expense.total_fee, expense.submitter,
+            create_time, expense.charge_date, expense.charge_method, expense.auditor,
+            expense.audit_date, expense.get_status_display(), expense.remarks
+        ])
+
+    return response

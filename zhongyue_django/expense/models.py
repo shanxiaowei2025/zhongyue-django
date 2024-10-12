@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import MaxLengthValidator
+from django.utils import timezone
 
 class Expense(models.Model):
     company_name = models.CharField(max_length=255, verbose_name='企业名称', db_comment='企业名称', null=True, blank=True)
@@ -30,8 +31,8 @@ class Expense(models.Model):
     social_insurance_start_date = models.DateField(verbose_name='社保开始日期', db_comment='社保开始日期', null=True, blank=True)
     social_insurance_end_date = models.DateField(verbose_name='社保结束日期', db_comment='社保结束日期', null=True, blank=True)
     statistical_report_fee = models.IntegerField(verbose_name='统计局报表费', db_comment='统计局报表费', null=True, blank=True)
-    social_insurance_start_date = models.DateField(verbose_name='统计开始日期', db_comment='统计开始日期', null=True, blank=True)
-    social_insurance_end_date = models.DateField(verbose_name='统计结束日期', db_comment='统计结束日期', null=True, blank=True)
+    statistical_start_date = models.DateField(verbose_name='统计开始日期', db_comment='统计开始日期', null=True, blank=True)
+    statistical_end_date = models.DateField(verbose_name='统计结束日期', db_comment='统计结束日期', null=True, blank=True)
     change_business = models.CharField(max_length=255, verbose_name='变更业务', db_comment='变更业务', null=True, blank=True)
     change_fee = models.IntegerField(verbose_name='变更收费', db_comment='变更收费', null=True, blank=True)
     administrative_license = models.CharField(max_length=255, verbose_name='行政许可', db_comment='行政许可', null=True, blank=True)
@@ -48,7 +49,7 @@ class Expense(models.Model):
     )
     total_fee = models.IntegerField(verbose_name='总费用', db_comment='总费用', null=True, blank=True)
     submitter = models.CharField(max_length=100, verbose_name='提交人', db_comment='提交人', null=True, blank=True)
-    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建日期', db_comment='创建日期')
+    create_time = models.DateTimeField(default=timezone.localtime(), verbose_name='创建日期', db_comment='创建日期')
     charge_date = models.DateField(verbose_name='收费日期', db_comment='收费日期', null=True, blank=True)
     charge_method = models.CharField(max_length=100, verbose_name='收费方式', db_comment='收费方式', null=True, blank=True)
     auditor = models.CharField(max_length=100, verbose_name='审核员', db_comment='审核员', null=True, blank=True)
