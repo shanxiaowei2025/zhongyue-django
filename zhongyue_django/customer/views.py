@@ -12,6 +12,8 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
+import os
+from django.conf import settings
 
 # Create your views here.
 
@@ -105,8 +107,35 @@ def get_customer_list(request):
 @parser_classes([MultiPartParser, FormParser])
 def create_customer(request):
     data = request.data.copy()
-    serializer = CustomerSerializer(data=data, context={'request': request})
+    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images']
+    
+    for field in image_fields:
+        files = request.FILES.getlist(field)
+        saved_paths = []
+        for file in files:
+            # 生成一个唯一的文件名
+            file_name = f"{field}_{file.name}"
+            subdirectory = 'customer_images'
+            full_path = os.path.join(settings.MEDIA_ROOT, subdirectory, file_name)
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            with open(full_path, 'wb+') as destination:
+                for chunk in file.chunks():
+                    destination.write(chunk)
+            
+            # 构建完整的 URL
+            relative_url = f"{settings.MEDIA_URL}{subdirectory}/{file_name}"
+            full_url = request.build_absolute_uri(relative_url)
+            saved_paths.append(full_url)
+        
+        data[field] = saved_paths
+    
+    
+    serializer = CustomerSerializer(data=data)
     if serializer.is_valid():
+        print(serializer.data)
         serializer.save(submitter=request.user.username)
         return Response({'success': True, 'data': serializer.data}, status=status.HTTP_201_CREATED)
     return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -120,8 +149,36 @@ def update_customer(request, pk):
     except Customer.DoesNotExist:
         return Response({'success': False, 'error': 'Customer not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = CustomerSerializer(customer, data=request.data, partial=True, context={'request': request})
+    data = request.data.copy()
+    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images']
+    
+    for field in image_fields:
+        files = request.FILES.getlist(field)
+        saved_paths = []
+        for file in files:
+            # 生成一个唯一的文件名
+            file_name = f"{field}_{file.name}"
+            subdirectory = 'customer_images'
+            full_path = os.path.join(settings.MEDIA_ROOT, subdirectory, file_name)
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            with open(full_path, 'wb+') as destination:
+                for chunk in file.chunks():
+                    destination.write(chunk)
+            
+            # 构建完整的 URL
+            relative_url = f"{settings.MEDIA_URL}{subdirectory}/{file_name}"
+            full_url = request.build_absolute_uri(relative_url)
+            saved_paths.append(full_url)
+        
+        data[field] = saved_paths
+    
+
+    serializer = CustomerSerializer(customer, data=data, partial=True, context={'request': request})
     if serializer.is_valid():
+        print(serializer.data)
         serializer.save()
         return Response({'success': True, 'data': serializer.data})
     return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -136,3 +193,13 @@ def delete_customer(request, pk):
 
     customer.delete()
     return Response({'success': True}, status=status.HTTP_204_NO_CONTENT)
+
+def save_images(images):
+    image_urls = []
+    for image in images:
+        file_path = os.path.join(settings.MEDIA_ROOT, 'customer_images', image.name)
+        with open(file_path, 'wb+') as destination:
+            for chunk in image.chunks():
+                destination.write(chunk)
+        image_urls.append(os.path.join(settings.MEDIA_URL, 'customer_images', image.name))
+    return image_urls

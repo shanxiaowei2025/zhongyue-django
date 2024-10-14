@@ -7,6 +7,18 @@ class CustomerSerializer(serializers.ModelSerializer):
     item_permissions = serializers.SerializerMethodField()
     create_time = serializers.SerializerMethodField()
     update_time = serializers.SerializerMethodField()
+    legal_person_id_images = serializers.ListField(
+        child=serializers.URLField(), required=False
+    )
+    other_id_images = serializers.ListField(
+        child=serializers.URLField(), required=False
+    )
+    business_license_images = serializers.ListField(
+        child=serializers.URLField(), required=False
+    )
+    bank_account_license_images = serializers.ListField(
+        child=serializers.URLField(), required=False
+    )
 
     class Meta:
         model = Customer
@@ -28,3 +40,22 @@ class CustomerSerializer(serializers.ModelSerializer):
             return timezone.localtime(obj.update_time).strftime('%Y-%m-%d %H:%M:%S')
         return None
 
+    def validate_legal_person_id_images(self, value):
+        return self._validate_image_list(value)
+
+    def validate_other_id_images(self, value):
+        return self._validate_image_list(value)
+
+    def validate_business_license_images(self, value):
+        return self._validate_image_list(value)
+
+    def validate_bank_account_license_images(self, value):
+        return self._validate_image_list(value)
+
+    def _validate_image_list(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("This field should be a list of URLs.")
+        for url in value:
+            if not isinstance(url, str):
+                raise serializers.ValidationError("Each item in the list should be a URL.")
+        return value
