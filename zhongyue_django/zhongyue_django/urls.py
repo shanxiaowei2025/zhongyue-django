@@ -67,6 +67,7 @@ urlpatterns = [
     path('dept/update', update_dept, name='update_dept'),  # 新增
     path('dept/delete', delete_dept, name='delete_dept'),  # 新增
     path('expense/', include('expense.urls')),
+    path('customer/', include('customer.urls')),
 ]
 
 if settings.DEBUG:
