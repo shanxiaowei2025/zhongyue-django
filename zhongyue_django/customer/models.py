@@ -23,7 +23,7 @@ class Customer(models.Model):
     daily_contact = models.CharField(max_length=100, verbose_name="日常业务联系人", help_text="日常业务联系人姓名", db_comment="日常业务联系人姓名", blank=True, null=True)
     daily_contact_phone = models.CharField(max_length=20, verbose_name="日常客户联系人电话", help_text="日常业务联系人的联系电话", db_comment="日常业务联系人的联系电话", blank=True, null=True)
     sales_representative = models.CharField(max_length=100, verbose_name="业务员", help_text="负责该客户的业务员姓名", db_comment="负责该客户的业务员姓名", blank=True, null=True)
-    social_credit_code = models.CharField(max_length=18, unique=True, verbose_name="统一社会信用代码", help_text="企业的统一社会信用代码", db_comment="企业的统一社会信用代码", blank=True, null=True)
+    social_credit_code = models.CharField(max_length=18, verbose_name="统一社会信用代码", help_text="企业的统一社会信用代码", db_comment="企业的统一社会信用代码", blank=True, null=True)
     tax_bureau = models.CharField(max_length=100, verbose_name="所属分局", help_text="企业所属的税务分局", db_comment="企业所属的税务分局", blank=True, null=True)
     business_source = models.CharField(max_length=100, verbose_name="业务来源", help_text="客户的业务来源渠道", db_comment="客户的业务来源渠道", blank=True, null=True)
     tax_registration_type = models.CharField(max_length=20, choices=TAX_REGISTRATION_CHOICES, verbose_name="税务登记类型", help_text="企业的税务登记类型", db_comment="企业的税务登记类型", blank=True, null=True)

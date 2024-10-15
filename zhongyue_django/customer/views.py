@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes, parser_class
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.paginator import Paginator
 from .models import Customer
 from .serializers import CustomerSerializer
@@ -14,6 +14,10 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
 import os
 from django.conf import settings
+import json
+from pathlib import Path
+import uuid
+from django.utils.encoding import escape_uri_path
 
 # Create your views here.
 
@@ -104,41 +108,65 @@ def get_customer_list(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@parser_classes([MultiPartParser, FormParser])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def create_customer(request):
     data = request.data.copy()
+        # 处理图片字段
     image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images']
-    
     for field in image_fields:
         files = request.FILES.getlist(field)
-        saved_paths = []
-        for file in files:
-            # 生成一个唯一的文件名
-            file_name = f"{field}_{file.name}"
-            subdirectory = 'customer_images'
-            full_path = os.path.join(settings.MEDIA_ROOT, subdirectory, file_name)
-            
-            # 确保目录存在
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            with open(full_path, 'wb+') as destination:
-                for chunk in file.chunks():
-                    destination.write(chunk)
-            
-            # 构建完整的 URL
-            relative_url = f"{settings.MEDIA_URL}{subdirectory}/{file_name}"
-            full_url = request.build_absolute_uri(relative_url)
-            saved_paths.append(full_url)
-        
-        data[field] = saved_paths
+        if files:
+            saved_paths = []
+            for file in files[:3]:  # 限制每个字段最多3张图片
+                saved_path = save_image(file, request)
+                print(saved_path)
+                saved_paths.append(saved_path)
+            data[field] = json.dumps(saved_paths)
+        elif field in data and isinstance(data[field], str):
+            try:
+                data[field] = json.loads(data[field])
+            except json.JSONDecodeError:
+                data[field] = []
     
+    # 处理布尔字段
+    bool_fields = ['has_online_banking', 'is_online_banking_custodian']
+    for field in bool_fields:
+        if field in data:
+            data[field] = data[field].lower() == 'true'
     
+    # 处理可能为 "null" 的数值字段
+    decimal_fields = ['registered_capital', 'paid_in_capital']
+    for field in decimal_fields:
+        if field in data and data[field] == 'null':
+            data[field] = None
     serializer = CustomerSerializer(data=data)
+    print(serializer)
     if serializer.is_valid():
-        print(serializer.data)
         serializer.save(submitter=request.user.username)
         return Response({'success': True, 'data': serializer.data}, status=status.HTTP_201_CREATED)
-    return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        print(serializer.errors)
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+def save_image(image, request):
+    # 生成一个唯一的文件名，避免中文和特殊字符问题
+    file_extension = Path(image.name).suffix
+    unique_filename = f"{uuid.uuid4().hex}{file_extension}"
+    
+    file_path = Path(settings.MEDIA_ROOT) / 'customer_images' / unique_filename
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with file_path.open('wb+') as destination:
+        for chunk in image.chunks():
+            destination.write(chunk)
+    
+    relative_url = str(Path(settings.MEDIA_URL) / 'customer_images' / unique_filename).replace('\\', '/')
+    
+    # 使用 escape_uri_path 来确保 URL 是正确编码的
+    escaped_relative_url = escape_uri_path(relative_url)
+    full_url = request.build_absolute_uri(escaped_relative_url)
+    
+    return full_url
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
@@ -203,3 +231,7 @@ def save_images(images):
                 destination.write(chunk)
         image_urls.append(os.path.join(settings.MEDIA_URL, 'customer_images', image.name))
     return image_urls
+
+
+
+

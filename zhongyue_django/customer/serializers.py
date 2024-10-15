@@ -2,27 +2,17 @@ from rest_framework import serializers
 from .models import Customer
 from .permissions import get_user_permissions
 from django.utils import timezone
+import json
 
 class CustomerSerializer(serializers.ModelSerializer):
     item_permissions = serializers.SerializerMethodField()
     create_time = serializers.SerializerMethodField()
     update_time = serializers.SerializerMethodField()
-    legal_person_id_images = serializers.ListField(
-        child=serializers.URLField(), required=False
-    )
-    other_id_images = serializers.ListField(
-        child=serializers.URLField(), required=False
-    )
-    business_license_images = serializers.ListField(
-        child=serializers.URLField(), required=False
-    )
-    bank_account_license_images = serializers.ListField(
-        child=serializers.URLField(), required=False
-    )
-
+    
     class Meta:
         model = Customer
         fields = '__all__'
+        read_only_fields = ('create_time', 'update_time', 'submitter')
 
     def get_item_permissions(self, obj):
         request = self.context.get('request')
@@ -31,31 +21,25 @@ class CustomerSerializer(serializers.ModelSerializer):
         return {}
 
     def get_create_time(self, obj):
-        if obj.create_time:
-            return timezone.localtime(obj.create_time).strftime('%Y-%m-%d %H:%M:%S')
-        return None
+        return obj.create_time.strftime('%Y-%m-%d %H:%M:%S') if obj.create_time else None
 
     def get_update_time(self, obj):
-        if obj.update_time:
-            return timezone.localtime(obj.update_time).strftime('%Y-%m-%d %H:%M:%S')
-        return None
+        return obj.update_time.strftime('%Y-%m-%d %H:%M:%S') if obj.update_time else None
 
-    def validate_legal_person_id_images(self, value):
-        return self._validate_image_list(value)
+    def to_internal_value(self, data):
 
-    def validate_other_id_images(self, value):
-        return self._validate_image_list(value)
+        # 处理日期字段
+        date_fields = ['establishment_date', 'license_expiry_date', 'capital_contribution_deadline']
+        for field in date_fields:
+            if field in data and data[field] == '':
+                data[field] = None
 
-    def validate_business_license_images(self, value):
-        return self._validate_image_list(value)
+        return super().to_internal_value(data)
 
-    def validate_bank_account_license_images(self, value):
-        return self._validate_image_list(value)
-
-    def _validate_image_list(self, value):
-        if not isinstance(value, list):
-            raise serializers.ValidationError("This field should be a list of URLs.")
-        for url in value:
-            if not isinstance(url, str):
-                raise serializers.ValidationError("Each item in the list should be a URL.")
-        return value
+    def validate(self, data):
+        # 验证图片字段
+        image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images']
+        for field in image_fields:
+            if field in data and len(data[field]) > 3:
+                raise serializers.ValidationError(f"{field} can have at most 3 images.")
+        return data
