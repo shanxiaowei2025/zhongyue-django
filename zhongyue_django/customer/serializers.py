@@ -36,10 +36,3 @@ class CustomerSerializer(serializers.ModelSerializer):
 
         return super().to_internal_value(data)
 
-    def validate(self, data):
-        # 验证图片字段
-        image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images']
-        for field in image_fields:
-            if field in data and len(data[field]) > 3:
-                raise serializers.ValidationError(f"{field} can have at most 3 images.")
-        return data

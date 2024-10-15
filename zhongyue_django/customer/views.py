@@ -112,7 +112,7 @@ def get_customer_list(request):
 def create_customer(request):
     data = request.data.copy()
         # 处理图片字段
-    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images']
+    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images','supplementary_images']
     for field in image_fields:
         files = request.FILES.getlist(field)
         if files:

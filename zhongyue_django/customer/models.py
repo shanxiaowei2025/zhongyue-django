@@ -2,22 +2,6 @@ from django.db import models
 from django.utils import timezone
 
 class Customer(models.Model):
-    ENTERPRISE_STATUS_CHOICES = [
-        ('active', '正常'),
-        ('suspended', '已注销'),
-        ('closed', '已流失'),
-    ]
-
-    TAX_REGISTRATION_CHOICES = [
-        ('general', '一般纳税人'),
-        ('small_scale', '小规模纳税人'),
-    ]
-
-    BUSINESS_STATUS_CHOICES = [
-        ('ongoing', '进行中'),
-        ('completed', '已完成'),
-        ('suspended', '已暂停'),
-    ]
 
     company_name = models.CharField(max_length=255, verbose_name="企业名称", help_text="企业的法定名称", db_comment="企业的法定名称", blank=True, null=True)
     daily_contact = models.CharField(max_length=100, verbose_name="日常业务联系人", help_text="日常业务联系人姓名", db_comment="日常业务联系人姓名", blank=True, null=True)
@@ -26,10 +10,10 @@ class Customer(models.Model):
     social_credit_code = models.CharField(max_length=18, verbose_name="统一社会信用代码", help_text="企业的统一社会信用代码", db_comment="企业的统一社会信用代码", blank=True, null=True)
     tax_bureau = models.CharField(max_length=100, verbose_name="所属分局", help_text="企业所属的税务分局", db_comment="企业所属的税务分局", blank=True, null=True)
     business_source = models.CharField(max_length=100, verbose_name="业务来源", help_text="客户的业务来源渠道", db_comment="客户的业务来源渠道", blank=True, null=True)
-    tax_registration_type = models.CharField(max_length=20, choices=TAX_REGISTRATION_CHOICES, verbose_name="税务登记类型", help_text="企业的税务登记类型", db_comment="企业的税务登记类型", blank=True, null=True)
+    tax_registration_type = models.CharField(max_length=20, verbose_name="税务登记类型", help_text="企业的税务登记类型", db_comment="企业的税务登记类型", blank=True, null=True)
     chief_accountant = models.CharField(max_length=100, verbose_name="主管会计", help_text="负责该企业的主管会计姓名", db_comment="负责该企业的主管会计姓名", blank=True, null=True)
     responsible_accountant = models.CharField(max_length=100, verbose_name="责任会计", help_text="负责该企业的责任会计姓名", db_comment="负责该企业的责任会计姓名", blank=True, null=True)
-    enterprise_status = models.CharField(max_length=20, choices=ENTERPRISE_STATUS_CHOICES, verbose_name="企业状态", help_text="企业当前的经营状态", db_comment="企业当前的经营状态", blank=True, null=True)
+    enterprise_status = models.CharField(max_length=20, verbose_name="企业状态", help_text="企业当前的经营状态", db_comment="企业当前的经营状态", blank=True, null=True)
     affiliated_enterprises = models.TextField(blank=True, verbose_name="同宗企业", help_text="与该企业有关联的其他企业", db_comment="与该企业有关联的其他企业", null=True)
     main_business = models.TextField(verbose_name="企业主营", help_text="企业的主要经营业务", db_comment="企业的主要经营业务", blank=True, null=True)
     boss_profile = models.TextField(blank=True, verbose_name="老板画像", help_text="企业老板的个人特征描述", db_comment="企业老板的个人特征描述", null=True)
@@ -71,14 +55,15 @@ class Customer(models.Model):
     tax_categories = models.TextField(verbose_name="税种", help_text="企业需要缴纳的税种", db_comment="企业需要缴纳的税种", blank=True, null=True)
     personal_income_tax_staff = models.TextField(verbose_name="申报个税人员", help_text="需要申报个人所得税的员工信息", db_comment="需要申报个人所得税的员工信息", blank=True, null=True)
     personal_income_tax_password = models.CharField(max_length=100, verbose_name="个税密码", help_text="个人所得税申报系统的登录密码", db_comment="个人所得税申报系统的登录密码", blank=True, null=True)
-    legal_person_id_images = models.JSONField(default=list, verbose_name="法人身份证图片", help_text="法定代表人身份证的扫描件或照片地址，最多三张", db_comment="法定代表人身份证的扫描件或照片地址，最多三张")
-    other_id_images = models.JSONField(default=list, verbose_name="其他身份证图片", help_text="其他相关人员身份证的扫描件或照片地址，最多三张", db_comment="其他相关人员身份证的扫描件或照片地址，最多三张")
-    business_license_images = models.JSONField(default=list, verbose_name="营业执照图片", help_text="企业营业执照的扫描件或照片地址，最多三张", db_comment="企业营业执照的扫描件或照片地址，最多三张")
-    bank_account_license_images = models.JSONField(default=list, verbose_name="开户许可图片", help_text="企业开户许可证的扫描件或照片地址，最多三张", db_comment="企业开户许可证的扫描件或照片地址，最多三张")
+    legal_person_id_images = models.JSONField(default=list, verbose_name="法人身份证图片", help_text="法定代表人身份证的扫描件或照片地址", db_comment="法定代表人身份证的扫描件或照片地址")
+    other_id_images = models.JSONField(default=list, verbose_name="其他身份证图片", help_text="其他相关人员身份证的扫描件或照片地址", db_comment="其他相关人员身份证的扫描件或照片地址")
+    business_license_images = models.JSONField(default=list, verbose_name="营业执照图片", help_text="企业营业执照的扫描件或照片地址", db_comment="企业营业执照的扫描件或照片地址")
+    bank_account_license_images = models.JSONField(default=list, verbose_name="开户许可图片", help_text="企业开户许可证的扫描件或照片地址", db_comment="企业开户许可证的扫描件或照片地址")
+    supplementary_images = models.JSONField(default=list, verbose_name="补充图片", help_text="其他补充的扫描件或照片地址", db_comment="其他补充的扫描件或照片地址")
     update_time = models.DateTimeField(auto_now=True, verbose_name="更新时间", help_text="记录的最后更新时间", db_comment="记录的最后更新时间", blank=True, null=True)
     create_time = models.DateTimeField(auto_now_add=True, verbose_name="创建时间", help_text="记录的创建时间", db_comment="记录的创建时间", blank=True, null=True)
     submitter = models.CharField(max_length=100, verbose_name="提交人", help_text="创建或最后修改该记录的用户", db_comment="创建或最后修改该记录的用户", blank=True, null=True)
-    business_status = models.CharField(max_length=20, choices=BUSINESS_STATUS_CHOICES, default='ongoing', verbose_name="业务状态", help_text="当前业务的状态", db_comment="当前业务的状态", blank=True, null=True)
+    business_status = models.CharField(max_length=20, default='ongoing', verbose_name="业务状态", help_text="当前业务的状态", db_comment="当前业务的状态", blank=True, null=True)
     
     def __str__(self):
         return self.company_name
