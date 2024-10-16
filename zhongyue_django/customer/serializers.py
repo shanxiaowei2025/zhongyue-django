@@ -1,8 +1,6 @@
 from rest_framework import serializers
 from .models import Customer
 from .permissions import get_user_permissions
-from django.utils import timezone
-import json
 
 class CustomerSerializer(serializers.ModelSerializer):
     item_permissions = serializers.SerializerMethodField()
@@ -35,4 +33,3 @@ class CustomerSerializer(serializers.ModelSerializer):
                 data[field] = None
 
         return super().to_internal_value(data)
-

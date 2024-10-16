@@ -111,13 +111,14 @@ def get_customer_list(request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def create_customer(request):
     data = request.data.copy()
+    print(data)
         # 处理图片字段
     image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images','supplementary_images']
     for field in image_fields:
         files = request.FILES.getlist(field)
         if files:
             saved_paths = []
-            for file in files[:3]:  # 限制每个字段最多3张图片
+            for file in files:  # 移除了 [:3] 限制
                 saved_path = save_image(file, request)
                 print(saved_path)
                 saved_paths.append(saved_path)
@@ -132,7 +133,12 @@ def create_customer(request):
     bool_fields = ['has_online_banking', 'is_online_banking_custodian']
     for field in bool_fields:
         if field in data:
-            data[field] = data[field].lower() == 'true'
+            if data[field] == ['null'] or data[field] == 'null':
+                data[field] = None
+            elif isinstance(data[field], list):
+                data[field] = data[field][0].lower() == 'true'
+            else:
+                data[field] = data[field].lower() == 'true'
     
     # 处理可能为 "null" 的数值字段
     decimal_fields = ['registered_capital', 'paid_in_capital']
@@ -140,7 +146,6 @@ def create_customer(request):
         if field in data and data[field] == 'null':
             data[field] = None
     serializer = CustomerSerializer(data=data)
-    print(serializer)
     if serializer.is_valid():
         serializer.save(submitter=request.user.username)
         return Response({'success': True, 'data': serializer.data}, status=status.HTTP_201_CREATED)
