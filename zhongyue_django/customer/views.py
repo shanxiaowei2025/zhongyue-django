@@ -18,6 +18,8 @@ import json
 from pathlib import Path
 import uuid
 from django.utils.encoding import escape_uri_path
+from django.core.exceptions import ValidationError
+from decimal import Decimal, InvalidOperation
 
 # Create your views here.
 
@@ -111,46 +113,23 @@ def get_customer_list(request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def create_customer(request):
     data = request.data.copy()
-    print(data)
-        # 处理图片字段
-    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images','supplementary_images']
+    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
+    
     for field in image_fields:
         files = request.FILES.getlist(field)
-        if files:
-            saved_paths = []
-            for file in files:  # 移除了 [:3] 限制
-                saved_path = save_image(file, request)
-                print(saved_path)
-                saved_paths.append(saved_path)
-            data[field] = json.dumps(saved_paths)
-        elif field in data and isinstance(data[field], str):
-            try:
-                data[field] = json.loads(data[field])
-            except json.JSONDecodeError:
-                data[field] = []
-    
-    # 处理布尔字段
-    bool_fields = ['has_online_banking', 'is_online_banking_custodian']
-    for field in bool_fields:
-        if field in data:
-            if data[field] == ['null'] or data[field] == 'null':
-                data[field] = None
-            elif isinstance(data[field], list):
-                data[field] = data[field][0].lower() == 'true'
-            else:
-                data[field] = data[field].lower() == 'true'
-    
-    # 处理可能为 "null" 的数值字段
-    decimal_fields = ['registered_capital', 'paid_in_capital']
-    for field in decimal_fields:
-        if field in data and data[field] == 'null':
-            data[field] = None
+        saved_paths = []
+        
+        for file in files:
+            saved_path = save_image(file, request)
+            saved_paths.append(saved_path)
+        
+        data[field] = json.dumps(saved_paths)
+
     serializer = CustomerSerializer(data=data)
     if serializer.is_valid():
         serializer.save(submitter=request.user.username)
         return Response({'success': True, 'data': serializer.data}, status=status.HTTP_201_CREATED)
     else:
-        print(serializer.errors)
         return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 def save_image(image, request):
@@ -175,7 +154,7 @@ def save_image(image, request):
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
-@parser_classes([MultiPartParser, FormParser])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def update_customer(request, pk):
     try:
         customer = Customer.objects.get(pk=pk)
@@ -183,38 +162,64 @@ def update_customer(request, pk):
         return Response({'success': False, 'error': 'Customer not found'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data.copy()
-    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images']
+    print(data)
+    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
     
+    # 处理 'null' 字符串和特殊字段
+    for key, value in data.items():
+        if value == 'null':
+            data[key] = None
+        elif key in ['has_online_banking', 'is_online_banking_custodian']:
+            data[key] = value.lower() == 'true' if value is not None else None
+        elif key in ['registered_capital', 'paid_in_capital']:
+            try:
+                data[key] = Decimal(value) if value not in [None, ''] else None
+            except InvalidOperation:
+                data[key] = None
+
+    # 移除 item_permissions 字段，因为它不是客户模型的一部分
+    data.pop('item_permissions', None)
+
     for field in image_fields:
         files = request.FILES.getlist(field)
-        saved_paths = []
-        for file in files:
-            # 生成一个唯一的文件名
-            file_name = f"{field}_{file.name}"
-            subdirectory = 'customer_images'
-            full_path = os.path.join(settings.MEDIA_ROOT, subdirectory, file_name)
-            
-            # 确保目录存在
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            with open(full_path, 'wb+') as destination:
-                for chunk in file.chunks():
-                    destination.write(chunk)
-            
-            # 构建完整的 URL
-            relative_url = f"{settings.MEDIA_URL}{subdirectory}/{file_name}"
-            full_url = request.build_absolute_uri(relative_url)
-            saved_paths.append(full_url)
+        existing_images = getattr(customer, field)
         
-        data[field] = saved_paths
-    
+        if isinstance(existing_images, str):
+            try:
+                existing_images = json.loads(existing_images)
+            except json.JSONDecodeError:
+                existing_images = []
+        elif not isinstance(existing_images, list):
+            existing_images = []
 
-    serializer = CustomerSerializer(customer, data=data, partial=True, context={'request': request})
-    if serializer.is_valid():
-        print(serializer.data)
-        serializer.save()
-        return Response({'success': True, 'data': serializer.data})
-    return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        new_images = []
+        
+        for file in files:
+            saved_path = save_image(file, request)
+            new_images.append(saved_path)
+        
+        # 如果没有新上传的文件，保留现有的图片
+        if not new_images and field in data:
+            try:
+                data[field] = json.loads(data[field])
+            except json.JSONDecodeError:
+                data[field] = existing_images
+        else:
+            # 合并现有的图片和新上传的图片
+            updated_images = existing_images + new_images
+            data[field] = updated_images
+
+    try:
+        serializer = CustomerSerializer(customer, data=data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'success': True, 'data': serializer.data})
+        else:
+            return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    except ValidationError as e:
+        return Response({'success': False, 'errors': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'success': False, 'errors': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
