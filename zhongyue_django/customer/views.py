@@ -113,6 +113,7 @@ def get_customer_list(request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def create_customer(request):
     data = request.data.copy()
+    print(data)
     image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
     
     for field in image_fields:
@@ -165,50 +166,49 @@ def update_customer(request, pk):
     print(data)
     image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
     
-    # 处理 'null' 字符串和特殊字段
+    # 处理非图片字段
     for key, value in data.items():
-        if value == 'null':
-            data[key] = None
-        elif key in ['has_online_banking', 'is_online_banking_custodian']:
-            data[key] = value.lower() == 'true' if value is not None else None
-        elif key in ['registered_capital', 'paid_in_capital']:
-            try:
-                data[key] = Decimal(value) if value not in [None, ''] else None
-            except InvalidOperation:
+        if key not in image_fields:
+            if value == 'null':
                 data[key] = None
+            elif key in ['has_online_banking', 'is_online_banking_custodian']:
+                data[key] = value.lower() == 'true' if value not in [None, ''] else None
+            elif key in ['registered_capital', 'paid_in_capital']:
+                try:
+                    data[key] = Decimal(value) if value not in [None, ''] else None
+                except InvalidOperation:
+                    data[key] = None
 
-    # 移除 item_permissions 字段，因为它不是客户模型的一部分
+    # 移除 item_permissions 字段
     data.pop('item_permissions', None)
-
+    # 处理图片字段
     for field in image_fields:
         files = request.FILES.getlist(field)
-        existing_images = getattr(customer, field)
+        existing_images = data.getlist(field) 
         
         if isinstance(existing_images, str):
             try:
                 existing_images = json.loads(existing_images)
             except json.JSONDecodeError:
-                existing_images = []
+                existing_images = [existing_images] if existing_images else []
         elif not isinstance(existing_images, list):
-            existing_images = []
+            existing_images = [existing_images] if existing_images else []
 
+        # 确保 existing_images 是一个扁平的列表
+        existing_images = [item for sublist in existing_images for item in (sublist if isinstance(sublist, list) else [sublist])]
+        
         new_images = []
         
+        # 处理现有图片
+        for image in existing_images:
+            if isinstance(image, str):
+                new_images.append(image)
+
+        # 处理新上传的文件
         for file in files:
             saved_path = save_image(file, request)
             new_images.append(saved_path)
-        
-        # 如果没有新上传的文件，保留现有的图片
-        if not new_images and field in data:
-            try:
-                data[field] = json.loads(data[field])
-            except json.JSONDecodeError:
-                data[field] = existing_images
-        else:
-            # 合并现有的图片和新上传的图片
-            updated_images = existing_images + new_images
-            data[field] = updated_images
-
+        data[field] =json.dumps(new_images) 
     try:
         serializer = CustomerSerializer(customer, data=data, partial=True)
         if serializer.is_valid():
