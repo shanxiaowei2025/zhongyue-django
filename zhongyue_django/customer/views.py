@@ -113,7 +113,6 @@ def get_customer_list(request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def create_customer(request):
     data = request.data.copy()
-    print(data)
     image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
     
     for field in image_fields:
@@ -163,7 +162,6 @@ def update_customer(request, pk):
         return Response({'success': False, 'error': 'Customer not found'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data.copy()
-    print(data)
     image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
     
     # 处理非图片字段
@@ -241,6 +239,23 @@ def save_images(images):
                 destination.write(chunk)
         image_urls.append(os.path.join(settings.MEDIA_URL, 'customer_images', image.name))
     return image_urls
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_customer_detail(request, id):
+    try:
+        customer = Customer.objects.get(id=id)
+        serializer = CustomerSerializer(customer)
+        return Response({
+            "success": True,
+            "data": serializer.data
+        })
+    except Customer.DoesNotExist:
+        return Response({
+            "success": False,
+            "error": "Customer not found"
+        }, status=status.HTTP_404_NOT_FOUND)
+
 
 
 
