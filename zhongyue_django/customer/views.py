@@ -70,24 +70,26 @@ def get_customer_list(request):
     queryset = Customer.objects.all()
     queryset, user_permissions = apply_permission_filters(queryset, user)
     
-    # 获取查询参数
+ # 获取查询参数
     company_name = request.query_params.get('companyName')
-    enterprise_status = request.query_params.get('enterpriseStatus')
-    submitter = request.query_params.get('submitter')
-    establishment_date_start = request.query_params.get('establishmentDateStart')
-    establishment_date_end = request.query_params.get('establishmentDateEnd')
+    daily_contact = request.query_params.get('dailyContact')
+    sales_representative = request.query_params.get('salesRepresentative')
+    tax_bureau = request.query_params.get('taxBureau')
+    boss_name = request.query_params.get('bossName')
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 10))
 
     # 应用搜索过滤
     if company_name:
         queryset = queryset.filter(company_name__icontains=company_name)
-    if enterprise_status:
-        queryset = queryset.filter(enterprise_status=enterprise_status)
-    if submitter:
-        queryset = queryset.filter(submitter__icontains=submitter)
-    if establishment_date_start and establishment_date_end:
-        queryset = queryset.filter(establishment_date__range=[establishment_date_start, establishment_date_end])
+    if daily_contact:
+        queryset = queryset.filter(daily_contact__icontains=daily_contact)
+    if sales_representative:
+        queryset = queryset.filter(sales_representative__icontains=sales_representative)
+    if tax_bureau:
+        queryset = queryset.filter(tax_bureau__icontains=tax_bureau)
+    if boss_name:
+        queryset = queryset.filter(boss_name__icontains=boss_name)
 
     # 排序
     queryset = queryset.order_by('-id')
@@ -255,6 +257,24 @@ def get_customer_detail(request, id):
             "success": False,
             "error": "Customer not found"
         }, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_related_customers(request):
+    boss_name = request.query_params.get('boss_name', None)
+    
+    if not boss_name:
+        return Response({'success': False, 'error': 'Boss name is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    related_customers = Customer.objects.filter(boss_name=boss_name).values('id', 'company_name')
+    
+    if not related_customers:
+        return Response({'success': False, 'error': 'No related customers found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    return Response({
+        'success': True,
+        'data': list(related_customers)
+    })
 
 
 

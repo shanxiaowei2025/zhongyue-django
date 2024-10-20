@@ -64,6 +64,7 @@ class Customer(models.Model):
     create_time = models.DateTimeField(auto_now_add=True, verbose_name="创建时间", help_text="记录的创建时间", db_comment="记录的创建时间", blank=True, null=True)
     submitter = models.CharField(max_length=100, verbose_name="提交人", help_text="创建或最后修改该记录的用户", db_comment="创建或最后修改该记录的用户", blank=True, null=True)
     business_status = models.CharField(max_length=20, default='ongoing', verbose_name="业务状态", help_text="当前业务的状态", db_comment="当前业务的状态", blank=True, null=True)
+    boss_name = models.CharField(max_length=100, verbose_name="老板名称", help_text="企业老板的姓名", db_comment="企业老板的姓名", blank=True, null=True)
     
     def __str__(self):
         return self.company_name
