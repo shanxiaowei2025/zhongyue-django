@@ -460,23 +460,6 @@ def delete_expense(request):
     except Expense.DoesNotExist:
         return Response({'success': False, 'message': 'Expense not found'}, status=status.HTTP_404_NOT_FOUND)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_company_names(request):
-    company_names = Expense.objects.values_list('company_name', flat=True).distinct()
-    return Response({
-        'success': True,
-        'data': list(company_names)
-    })
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_submitters(request):
-    submitters = Expense.objects.values_list('submitter', flat=True).distinct()
-    return Response({
-        'success': True,
-        'data': list(submitters)
-    })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
