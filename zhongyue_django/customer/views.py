@@ -20,6 +20,12 @@ import uuid
 from django.utils.encoding import escape_uri_path
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+from io import BytesIO
+import json
+from django.db import models
 
 # Create your views here.
 
@@ -276,7 +282,72 @@ def get_related_customers(request):
         'data': list(related_customers)
     })
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_customers(request):
+    # 获取查询参数
+    company_name = request.query_params.get('companyName')
+    daily_contact = request.query_params.get('dailyContact')
+    sales_representative = request.query_params.get('salesRepresentative')
+    tax_bureau = request.query_params.get('taxBureau')
+    boss_name = request.query_params.get('bossName')
 
+    # 应用过滤
+    queryset = Customer.objects.all()
+    if company_name:
+        queryset = queryset.filter(company_name__icontains=company_name)
+    if daily_contact:
+        queryset = queryset.filter(daily_contact__icontains=daily_contact)
+    if sales_representative:
+        queryset = queryset.filter(sales_representative__icontains=sales_representative)
+    if tax_bureau:
+        queryset = queryset.filter(tax_bureau__icontains=tax_bureau)
+    if boss_name:
+        queryset = queryset.filter(boss_name__icontains=boss_name)
 
+    # 应用权限过滤
+    queryset, _ = apply_permission_filters(queryset, request.user)
 
+    # 创建工作簿和工作表
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "客户列表"
 
+    # 获取所有字段
+    fields = [field for field in Customer._meta.get_fields() if not field.is_relation]
+
+    # 写入表头
+    for col, field in enumerate(fields, start=1):
+        ws.cell(row=1, column=col, value=field.verbose_name)
+
+    # 写入数据
+    for row, customer in enumerate(queryset, start=2):
+        for col, field in enumerate(fields, start=1):
+            value = getattr(customer, field.name)
+            if isinstance(field, models.JSONField):
+                value = json.dumps(value, ensure_ascii=False)
+            elif isinstance(field, models.DateTimeField):
+                value = value.strftime('%Y-%m-%d %H:%M:%S') if value else ''
+            elif isinstance(field, models.DateField):
+                value = value.strftime('%Y-%m-%d') if value else ''
+            elif field.name in ['has_online_banking', 'is_online_banking_custodian']:
+                value = '是' if value == 'true' else '否' if value == 'false' else ''
+            ws.cell(row=row, column=col, value=value)
+
+    # 调整列宽
+    for col in range(1, len(fields) + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 20
+
+    # 保存到内存中
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    # 创建 HTTP 响应
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename=customers.xlsx'
+
+    return response
