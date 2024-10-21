@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 from .models import Customer
 from .serializers import CustomerSerializer
 from .permissions import get_user_permissions
-from django.db.models import Q
+from django.db.models import Q, fields as model_fields
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
@@ -72,30 +72,26 @@ def apply_permission_filters(queryset, user):
 @permission_classes([IsAuthenticated])
 def get_customer_list(request):
     user = request.user
-    
     queryset = Customer.objects.all()
     queryset, user_permissions = apply_permission_filters(queryset, user)
-    
- # 获取查询参数
-    company_name = request.query_params.get('companyName')
-    daily_contact = request.query_params.get('dailyContact')
-    sales_representative = request.query_params.get('salesRepresentative')
-    tax_bureau = request.query_params.get('taxBureau')
-    boss_name = request.query_params.get('bossName')
+
+    print("Received query params:", request.query_params)
+
+    # 创建字段映射
+    field_mapping = generate_field_mapping()
+
+    # 动态处理搜索参数
+    for key, value in request.query_params.items():
+        if value:
+            db_field = field_mapping.get(key, key)  # 如果没有映射，使用原始键
+            if hasattr(Customer, db_field):
+                queryset = queryset.filter(**{f"{db_field}__icontains": value})
+
+    print("After filtering:", queryset)
+
+    # 获取查询参数
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 10))
-
-    # 应用搜索过滤
-    if company_name:
-        queryset = queryset.filter(company_name__icontains=company_name)
-    if daily_contact:
-        queryset = queryset.filter(daily_contact__icontains=daily_contact)
-    if sales_representative:
-        queryset = queryset.filter(sales_representative__icontains=sales_representative)
-    if tax_bureau:
-        queryset = queryset.filter(tax_bureau__icontains=tax_bureau)
-    if boss_name:
-        queryset = queryset.filter(boss_name__icontains=boss_name)
 
     # 排序
     queryset = queryset.order_by('-id')
@@ -115,6 +111,8 @@ def get_customer_list(request):
             'permissions': user_permissions
         }
     })
+
+    print("Received query params:", request.query_params)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -351,3 +349,17 @@ def export_customers(request):
     response['Content-Disposition'] = 'attachment; filename=customers.xlsx'
 
     return response
+
+def generate_field_mapping():
+    """
+    生成前端驼峰命名到后端下划线命名的字段映射
+    """
+    def snake_to_camel(name):
+        components = name.split('_')
+        return components[0] + ''.join(x.title() for x in components[1:])
+
+    # 获取模型的所有字段
+    model_field_names = [f.name for f in Customer._meta.get_fields() if isinstance(f, model_fields.Field)]
+    
+    # 创建映射
+    return {snake_to_camel(field): field for field in model_field_names}
