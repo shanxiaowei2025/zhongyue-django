@@ -73,31 +73,19 @@ def get_expense_list(request):
     current_role = request.query_params.get('current_role', 'default')
     
     queryset = Expense.objects.all()
-    queryset,user_permissions = apply_permission_filters(queryset, user, current_role)
+    queryset, user_permissions = apply_permission_filters(queryset, user, current_role)
     
-    # 获取查询参数
-    company_name = request.query_params.get('companyName')
-    status = request.query_params.get('status')
-    submitter = request.query_params.get('submitter')
-    charge_date_start = request.query_params.get('chargeDateStart')
-    charge_date_end = request.query_params.get('chargeDateEnd')
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 10))
-
-    # 应用搜索过滤
-    if company_name:
-        queryset = queryset.filter(company_name__icontains=company_name)
-    if status != '':
-        queryset = queryset.filter(status=status)
-    if submitter:
-        queryset = queryset.filter(submitter__icontains=submitter)
-    if charge_date_start and charge_date_end:
-        queryset = queryset.filter(charge_date__range=[charge_date_start, charge_date_end])
+    # 使用新的函数构建查询条件
+    query = build_search_query(request)
+    # 应用查询条件
+    queryset = queryset.filter(query)
 
     # 排序
     queryset = queryset.order_by('-id')
 
     # 分页
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 10))
     paginator = Paginator(queryset, page_size)
     expenses = paginator.get_page(page)
 
@@ -284,6 +272,7 @@ def update_expense(request):
         expense = Expense.objects.get(id=expense_id)
         data = request.data.copy()
         converted_data = {}
+        print(data)
         
         # 字段名称映射
         field_mapping = {
@@ -542,3 +531,67 @@ def export_expenses(request):
         ])
 
     return response
+
+def build_search_query(request):
+    query = Q()
+
+    # 所有搜索字段
+    search_fields = {
+        'companyName': {'field': 'company_name', 'lookup': 'icontains'},
+        'status': {'field': 'status', 'lookup': 'exact'},
+        'submitter': {'field': 'submitter', 'lookup': 'icontains'},
+        'company_location': {'lookup': 'icontains'},
+        'business_type': {'lookup': 'icontains'},
+        'agency_type': {'lookup': 'icontains'},
+        'contract_type': {'lookup': 'icontains'},
+        'agency_fee': {'lookup': 'exact'},
+        'accounting_software_fee': {'lookup': 'exact'},
+        'address_fee': {'lookup': 'exact'},
+        'agency_start_date': {'lookup': 'gte'},
+        'agency_end_date': {'lookup': 'gte'},
+        'invoice_software_provider': {'lookup': 'icontains'},
+        'invoice_software_fee': {'lookup': 'exact'},
+        'invoice_software_start_date': {'lookup': 'gte'},
+        'invoice_software_end_date': {'lookup': 'gte'},
+        'social_insurance_agency_fee': {'lookup': 'exact'},
+        'insured_count': {'lookup': 'exact'},
+        'insurance_types': {'lookup': 'icontains'},
+        'social_insurance_start_date': {'lookup': 'gte'},
+        'social_insurance_end_date': {'lookup': 'gte'},
+        'statistical_report_fee': {'lookup': 'exact'},
+        'statistical_start_date': {'lookup': 'gte'},
+        'statistical_end_date': {'lookup': 'gte'},
+        'license_type': {'lookup': 'icontains'},
+        'license_fee': {'lookup': 'exact'},
+        'one_time_address_fee': {'lookup': 'exact'},
+        'brand_fee': {'lookup': 'exact'},
+        'seal_fee': {'lookup': 'exact'},
+        'change_fee': {'lookup': 'exact'},
+        'change_business': {'lookup': 'icontains'},
+        'administrative_license': {'lookup': 'icontains'},
+        'administrative_license_fee': {'lookup': 'exact'},
+        'other_business': {'lookup': 'icontains'},
+        'other_business_fee': {'lookup': 'exact'},
+        'total_fee': {'lookup': 'exact'},
+        'charge_method': {'lookup': 'icontains'},
+        'auditor': {'lookup': 'icontains'},
+        'audit_date': {'lookup': 'gte'},
+        'create_time': {'lookup': 'gte'}
+    }
+
+    for param, config in search_fields.items():
+        value = request.query_params.get(param)
+        print(request.query_params)
+
+        if value:
+            field = config.get('field', param)
+            lookup = config['lookup']
+            query &= Q(**{f"{field}__{lookup}": value})
+
+    # 处理日期范围
+    charge_date_start = request.query_params.get('chargeDateStart')
+    charge_date_end = request.query_params.get('chargeDateEnd')
+    if charge_date_start and charge_date_end:
+        query &= Q(charge_date__range=[charge_date_start, charge_date_end])
+    print(query)
+    return query

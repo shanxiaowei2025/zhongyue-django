@@ -75,7 +75,6 @@ def get_customer_list(request):
     queryset = Customer.objects.all()
     queryset, user_permissions = apply_permission_filters(queryset, user)
 
-    print("Received query params:", request.query_params)
 
     # 创建字段映射
     field_mapping = generate_field_mapping()
@@ -87,7 +86,6 @@ def get_customer_list(request):
             if hasattr(Customer, db_field):
                 queryset = queryset.filter(**{f"{db_field}__icontains": value})
 
-    print("After filtering:", queryset)
 
     # 获取查询参数
     page = int(request.query_params.get('page', 1))
