@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 from .models import Customer
 from .serializers import CustomerSerializer
 from .permissions import get_user_permissions
-from django.db.models import Q, fields as model_fields
+from django.db.models import Q, fields as model_fields, Func, F
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
@@ -26,6 +26,7 @@ from openpyxl.utils import get_column_letter
 from io import BytesIO
 import json
 from django.db import models
+from django.db.models.functions import Lower
 
 # Create your views here.
 
@@ -110,7 +111,6 @@ def get_customer_list(request):
         }
     })
 
-    print("Received query params:", request.query_params)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -361,3 +361,30 @@ def generate_field_mapping():
     
     # 创建映射
     return {snake_to_camel(field): field for field in model_field_names}
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_autocomplete_options(request):
+    field = request.query_params.get('field')
+    query = request.query_params.get('query', '').lower()
+    
+    if not field:
+        return Response({'success': False, 'error': 'Field parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not hasattr(Customer, field):
+        return Response({'success': False, 'error': 'Invalid field'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 应用权限过滤
+    queryset, _ = apply_permission_filters(Customer.objects.all(), request.user)
+    
+    # 获取唯一值，忽略大小写，并按字段值排序
+    values = queryset.annotate(
+        lower_field=Lower(field)
+    ).filter(
+        lower_field__contains=query
+    ).values_list(field, flat=True).distinct().order_by(field)[:10]  # 限制返回前10个结果
+    
+    return Response({
+        'success': True,
+        'data': list(values)
+    })

@@ -22,6 +22,8 @@ from django.db.models import Q
 import csv
 from django.http import HttpResponse
 from django.utils import timezone
+from django.db.models import Func, F
+from django.db.models.functions import Lower
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
@@ -595,3 +597,30 @@ def build_search_query(request):
         query &= Q(charge_date__range=[charge_date_start, charge_date_end])
     print(query)
     return query
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_autocomplete_options(request):
+    field = request.query_params.get('field')
+    query = request.query_params.get('query', '').lower()
+    
+    if not field:
+        return Response({'success': False, 'error': 'Field parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not hasattr(Expense, field):
+        return Response({'success': False, 'error': 'Invalid field'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 应用权限过滤
+    queryset, _ = apply_permission_filters(Expense.objects.all(), request.user, request.query_params.get('current_role', 'default'))
+    
+    # 获取唯一值，忽略大小写，并按字段值排序
+    values = queryset.annotate(
+        lower_field=Lower(field)
+    ).filter(
+        lower_field__contains=query
+    ).values_list(field, flat=True).distinct().order_by(field)[:10]  # 限制返回前10个结果
+    
+    return Response({
+        'success': True,
+        'data': list(values)
+    })
