@@ -38,6 +38,8 @@ from users.views import (
     update_dept,
     delete_dept,
     get_user_roles,
+    get_permissions_list,
+    update_permission,
 )
 
 from django.conf import settings
@@ -68,6 +70,8 @@ urlpatterns = [
     path('dept/delete', delete_dept, name='delete_dept'),  # 新增
     path('expense/', include('expense.urls')),
     path('customer/', include('customer.urls')),
+    path('permission', get_permissions_list, name='get_permissions_list'),  # 新增
+    path('permission/update', update_permission, name='update_permission'),  # 新增
 ]
 
 if settings.DEBUG:

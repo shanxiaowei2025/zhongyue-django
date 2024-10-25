@@ -41,6 +41,8 @@ class User(AbstractUser):
 
     def has_role(self, role_name):
         return role_name in self.roles
+    class Meta:
+        db_table = 'zy_user'
 
 class AsyncRoute(models.Model):
     path = models.CharField(max_length=255, default='', verbose_name='路由路径', db_comment='异步路由路径')
@@ -65,8 +67,11 @@ class AsyncRoute(models.Model):
         if children:
             result['children'] = [child.to_dict() for child in children]
         return result
+    class Meta:
+        db_table = 'zy_async_route'
 
 class Role(models.Model):
+    id = models.AutoField(primary_key=True, verbose_name='角色ID', db_comment='角色ID')
     name = models.CharField(max_length=50, unique=True, default='', verbose_name='角色名称', db_comment='角色名称')
     code = models.CharField(max_length=50, unique=True, default='', verbose_name='角色代码', db_comment='角色唯一代码')
     status = models.IntegerField(choices=((0, '禁用'), (1, '启用')), default=1, verbose_name='状态', db_comment='角色状态：0-禁用，1-启用')
@@ -76,6 +81,8 @@ class Role(models.Model):
 
     def __str__(self):
         return self.name
+    class Meta:
+        db_table = 'zy_role'
 
 class Department(models.Model):
     name = models.CharField(max_length=100, default='', verbose_name='部门名称', db_comment='部门名称')
@@ -94,3 +101,71 @@ class Department(models.Model):
 
     class Meta:
         ordering = ['sort', 'id']
+        db_table = 'zy_department'
+
+class Permission(models.Model):
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='permissions', verbose_name='角色', db_comment='关联的角色',to_field='id')
+    role_name = models.CharField(max_length=50, verbose_name='角色名称', db_comment='角色名称')
+    
+    # 费用管理权限
+    expense_data_view_all = models.BooleanField(default=False, verbose_name='费用管理-查看全部', db_comment='是否可以查看所有费用数据')
+    expense_data_view_by_location = models.BooleanField(default=False, verbose_name='费用管理-查看本地', db_comment='是否可以查看本地费用数据')
+    expense_data_view_department_submissions = models.BooleanField(default=False, verbose_name='费用管理-查看部门', db_comment='是否可以查看部门费用数据')
+    expense_data_view_own = models.BooleanField(default=False, verbose_name='费用管理-查看自己', db_comment='是否可以查看自己的费用数据')
+    expense_action_create = models.BooleanField(default=False, verbose_name='费用管理-创建', db_comment='是否可以创建费用')
+    expense_action_edit = models.BooleanField(default=False, verbose_name='费用管理-编辑', db_comment='是否可以编辑费用')
+    expense_action_delete = models.BooleanField(default=False, verbose_name='费用管理-删除', db_comment='是否可以删除费用')
+    expense_action_audit = models.BooleanField(default=False, verbose_name='费用管理-审核', db_comment='是否可以审核费用')
+
+    # 客户信息权限
+    customer_data_view_all = models.BooleanField(default=False, verbose_name='客户信息-查看全部', db_comment='是否可以查看所有客户信息')
+    customer_data_view_by_location = models.BooleanField(default=False, verbose_name='客户信息-查看本地', db_comment='是否可以查看本地客户信息')
+    customer_data_view_department_submissions = models.BooleanField(default=False, verbose_name='客户信息-查看部门', db_comment='是否可以查看部门客户信息')
+    customer_data_view_own = models.BooleanField(default=False, verbose_name='客户信息-查看自己', db_comment='是否可以查看自己的客户信息')
+    customer_action_create = models.BooleanField(default=False, verbose_name='客户信息-创建', db_comment='是否可以创建客户信息')
+    customer_action_edit = models.BooleanField(default=False, verbose_name='客户信息-编辑', db_comment='是否可以编辑客户信息')
+    customer_action_delete = models.BooleanField(default=False, verbose_name='客户信息-删除', db_comment='是否可以删除客户信息')
+
+    class Meta:
+        db_table = 'zy_permission'
+        unique_together = ('role',)
+
+    def __str__(self):
+        return f"{self.role_name} 的权限"
+
+    def save(self, *args, **kwargs):
+        if not self.role_name:
+            self.role_name = self.role.name
+        super().save(*args, **kwargs)
+
+    def to_dict(self):
+        return {
+            'role_name': self.role_name,
+            'expense': {
+                'data': {
+                    'view_all': self.expense_data_view_all,
+                    'view_by_location': self.expense_data_view_by_location,
+                    'view_department_submissions': self.expense_data_view_department_submissions,
+                    'view_own': self.expense_data_view_own
+                },
+                'action': {
+                    'create': self.expense_action_create,
+                    'edit': self.expense_action_edit,
+                    'delete': self.expense_action_delete,
+                    'audit': self.expense_action_audit
+                }
+            },
+            'customer': {
+                'data': {
+                    'view_all': self.customer_data_view_all,
+                    'view_by_location': self.customer_data_view_by_location,
+                    'view_department_submissions': self.customer_data_view_department_submissions,
+                    'view_own': self.customer_data_view_own
+                },
+                'action': {
+                    'create': self.customer_action_create,
+                    'edit': self.customer_action_edit,
+                    'delete': self.customer_action_delete
+                }
+            }
+        }

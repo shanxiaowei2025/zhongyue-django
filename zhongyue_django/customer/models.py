@@ -72,3 +72,4 @@ class Customer(models.Model):
     class Meta:
         verbose_name = '客户信息'
         verbose_name_plural = '客户信息'
+        db_table = 'zy_customer'

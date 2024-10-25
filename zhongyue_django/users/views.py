@@ -9,7 +9,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.exceptions import TokenError
 import logging
-from .models import AsyncRoute, Role, Department
+from .models import AsyncRoute, Role, Department, Permission
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
@@ -24,6 +24,9 @@ import os
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.utils import timezone
+from django.db import transaction
+from django.db.models import Model
+from django.db import models
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -86,7 +89,7 @@ class RefreshTokenView(APIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_async_routes(request):
-    top_level_routes = AsyncRoute.objects.filter(parent=None)  # 只获取启用的顶级路由
+    top_level_routes = AsyncRoute.objects.filter(parent=None)  # 只获取启用的顶路由
     routes_data = [route.to_dict() for route in top_level_routes]
     return Response({
         "success": True,
@@ -388,7 +391,6 @@ def create_role(request):
         'status': data.get('status', 1),
         'remark': data.get('remark')
     }
-    print(role_data)
     role_serializer = RoleSerializer(data=role_data)
     
     if role_serializer.is_valid():
@@ -543,3 +545,70 @@ def get_user_roles(request):
             'roles': roles
         }
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_permissions_list(request):
+    permissions = Permission.objects.all()
+    permissions_data = []
+
+    for permission in permissions:
+        permissions_data.append({
+            'role_name': permission.role_name,
+            'permissions': permission.to_dict()
+        })
+    print(permissions_data)
+    return JsonResponse({
+        'success': True,
+        'data': permissions_data
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_permission(request):
+    data = json.loads(request.body)
+    print(data)
+    role_name = data.get('role')
+    field_name = data.get('field')
+    is_allowed = data.get('isAllowed')
+    
+
+    if not all([role_name, field_name, is_allowed is not None]):
+        return JsonResponse({
+            'success': False,
+            'message': '缺少必要的参数'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # 检查字段名是否合法
+    valid_fields = [f.name for f in Permission._meta.fields if isinstance(f, models.BooleanField)]
+    if field_name not in valid_fields:
+        return JsonResponse({
+            'success': False,
+            'message': '无效的权限字段'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        with transaction.atomic():
+            print(role_name)
+            permission = Permission.objects.get(role_name=role_name)
+            setattr(permission, field_name, is_allowed)
+            permission.save()
+            
+            # 更新后重新获取权限数据
+            updated_permission = Permission.objects.get(role_name=role_name)
+            return JsonResponse({
+                'success': True,
+                'message': f'已更新 {role_name} 的 {field_name} 权限',
+                'data': updated_permission.to_dict()
+            })
+    except Permission.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '权限记录不存在'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

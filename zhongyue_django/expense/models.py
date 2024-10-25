@@ -64,3 +64,4 @@ class Expense(models.Model):
     class Meta:
         verbose_name = '费用记录'
         verbose_name_plural = '费用记录'
+        db_table = 'zy_expense'
