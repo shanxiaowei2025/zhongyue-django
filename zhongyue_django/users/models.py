@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db.models.signals import post_save, pre_save, post_delete
+from django.dispatch import receiver
 
 class User(AbstractUser):
     nickname = models.CharField(max_length=50, blank=True, default='', verbose_name='昵称', db_comment='用户昵称')
@@ -174,3 +176,38 @@ class Permission(models.Model):
                 }
             }
         }
+
+@receiver(post_save, sender=Role)
+def create_or_update_permission(sender, instance, created, **kwargs):
+    """当角色创建或更新时，同步更新权限表"""
+    if created:
+        # 创建新角色时，初始化权限记录
+        Permission.objects.create(
+            role=instance,
+            role_name=instance.name
+        )
+    else:
+        # 更新角色时，同步更新权限表中的角色名称
+        Permission.objects.filter(role=instance).update(role_name=instance.name)
+
+# 在 Role 类的 Meta 类后面添加
+Role.post_save = post_save.connect(create_or_update_permission, sender=Role)
+
+@receiver(post_delete, sender=Role)
+def delete_role_permissions(sender, instance, **kwargs):
+    """当角色被删除时，同步删除权限记录和更新用户角色"""
+    try:
+        # 删除对应的权限记录
+        Permission.objects.filter(role_name=instance.name).delete()
+        
+        # 更新所有用户的角色列表
+        users = User.objects.all()
+        for user in users:
+            if instance.name in user.roles:
+                user.roles.remove(instance.name)
+                user.save()
+    except Exception as e:
+        print(f"Error in delete_role_permissions: {str(e)}")
+
+# 确保信号被注册
+Role.post_delete = post_delete.connect(delete_role_permissions, sender=Role)

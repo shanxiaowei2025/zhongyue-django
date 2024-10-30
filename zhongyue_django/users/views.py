@@ -385,48 +385,99 @@ def update_user_roles(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_role(request):
-    data = json.loads(request.body)
-    role_data = {
-        'name': data.get('name'),
-        'code': data.get('code'),
-        'status': data.get('status', 1),
-        'remark': data.get('remark')
-    }
-    role_serializer = RoleSerializer(data=role_data)
-    
-    if role_serializer.is_valid():
-        role = role_serializer.save()
-        return JsonResponse({'success': True, 'data': role_serializer.data}, status=status.HTTP_201_CREATED)
-    return JsonResponse({'success': False, 'errors': role_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
-@csrf_exempt
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def update_role(request):
-    data = json.loads(request.body)
-    role_id = data.get('id')
     try:
-        role = Role.objects.get(id=role_id)
-        role_serializer = RoleSerializer(role, data=data, partial=True)
-        if role_serializer.is_valid():
-            role_serializer.save()
-            return JsonResponse({'success': True, 'data': role_serializer.data}, status=status.HTTP_200_OK)
-        return JsonResponse({'success': False, 'errors': role_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            data = json.loads(request.body)
+            role = Role.objects.create(
+                name=data['name'],
+                code=data['code'],
+                status=data.get('status', 1),
+                remark=data.get('remark', '')
+            )
+            # 信号处理器会自动创建对应的权限记录
+            return JsonResponse({
+                'success': True,
+                'message': '角色创建成功',
+                'data': {
+                    'id': role.id,
+                    'name': role.name,
+                    'code': role.code,
+                    'status': role.status,
+                    'remark': role.remark
+                }
+            })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'角色创建失败: {str(e)}'
+        }, status=400)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_role(request, role_id):
+    try:
+        with transaction.atomic():
+            role = Role.objects.get(id=role_id)
+            data = json.loads(request.body)
+            
+            # 更新角色信息
+            role.name = data.get('name', role.name)
+            role.code = data.get('code', role.code)
+            role.status = data.get('status', role.status)
+            role.remark = data.get('remark', role.remark)
+            role.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': '角色更新成功',
+                'data': {
+                    'id': role.id,
+                    'name': role.name,
+                    'code': role.code,
+                    'status': role.status,
+                    'remark': role.remark
+                }
+            })
     except Role.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+        return JsonResponse({
+            'success': False,
+            'message': '角色不存在'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'角色更新失败: {str(e)}'
+        }, status=400)
 
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def delete_role(request):
-    data = json.loads(request.body)
-    role_id = data.get('id')
     try:
-        role = Role.objects.get(id=role_id)
-        role.delete()
-        return JsonResponse({'success': True, 'message': 'Role deleted successfully'}, status=status.HTTP_200_OK)
+        with transaction.atomic():
+            data = json.loads(request.body)
+            role_id = data.get('id')
+            
+            role = Role.objects.get(id=role_id)
+            role_name = role.name
+            
+            # 删除角色（会触发信号处理器）
+            role.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'角色 {role_name} 已删除'
+            })
     except Role.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+        return JsonResponse({
+            'success': False,
+            'message': '角色不存在'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'删除角色失败: {str(e)}'
+        }, status=400)
 def convert_to_frontend_format(data):
     """将后端字段名转换为前端所需的格式"""
     field_mapping = {
