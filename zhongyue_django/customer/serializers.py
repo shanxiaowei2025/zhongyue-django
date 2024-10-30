@@ -1,11 +1,9 @@
 from rest_framework import serializers
 from .models import Customer
-from .permissions import get_user_permissions
 import json
 from decimal import Decimal
 
 class CustomerSerializer(serializers.ModelSerializer):
-    item_permissions = serializers.SerializerMethodField()
     create_time = serializers.SerializerMethodField()
     update_time = serializers.SerializerMethodField()
     
@@ -14,11 +12,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('create_time', 'update_time', 'submitter')
 
-    def get_item_permissions(self, obj):
-        request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            return get_user_permissions(request.user)
-        return {}
+
 
     def get_create_time(self, obj):
         return obj.create_time.strftime('%Y-%m-%d %H:%M:%S') if obj.create_time else None

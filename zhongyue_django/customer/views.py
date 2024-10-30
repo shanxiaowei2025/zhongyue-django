@@ -7,7 +7,6 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.paginator import Paginator
 from .models import Customer
 from .serializers import CustomerSerializer
-from .permissions import get_user_permissions
 from django.db.models import Q, fields as model_fields, Func, F
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
@@ -27,6 +26,7 @@ from io import BytesIO
 import json
 from django.db import models
 from django.db.models.functions import Lower
+from users.views import get_user_permissions_helper
 
 # Create your views here.
 
@@ -49,32 +49,33 @@ class CustomerViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-def apply_permission_filters(queryset, user):
-    user_permissions = get_user_permissions(user)
+def apply_permission_filters(queryset, request):
+    user = request.user
+    user_permissions = get_user_permissions_helper(user)
+    customer_permissions = user_permissions['permissions']['customer']
     
-    if not user_permissions['data']['viewAll']:
+    if not customer_permissions['data']['view_all']:
         filters = Q()
         
-        if user_permissions['data']['viewOwn']:
+        if customer_permissions['data']['view_own']:
             filters |= Q(submitter=user.username)
         
-        if user_permissions['data']['viewByLocation']:
-            filters |= Q(business_address__icontains=user_permissions['data']['viewByLocation'])
+        if customer_permissions['data']['view_by_location']:
+            filters |= Q(business_address__icontains=customer_permissions['data']['view_by_location'])
         
-        if user_permissions['data']['viewDepartmentSubmissions']:
-            department_users = User.objects.filter(dept_id=user.dept_id).values_list('username', flat=True)
+        if customer_permissions['data']['view_department_submissions']:
+            department_users = user.objects.filter(dept_id=user.dept_id).values_list('username', flat=True)
             filters |= Q(submitter__in=department_users)
         
         queryset = queryset.filter(filters)
     
-    return queryset, user_permissions
+    return queryset, customer_permissions
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_customer_list(request):
-    user = request.user
     queryset = Customer.objects.all()
-    queryset, user_permissions = apply_permission_filters(queryset, user)
+    queryset, customer_permissions = apply_permission_filters(queryset, request)
 
 
     # 创建字段映射
@@ -100,6 +101,8 @@ def get_customer_list(request):
     customers = paginator.get_page(page)
 
     serializer = CustomerSerializer(customers, many=True, context={'request': request})
+    print(serializer.data)
+    print(customer_permissions)
     return Response({
         'success': True,
         'data': {
@@ -107,7 +110,7 @@ def get_customer_list(request):
             'total': paginator.count,
             'currentPage': page,
             'pageSize': page_size,
-            'permissions': user_permissions
+            'permissions': customer_permissions
         }
     })
 

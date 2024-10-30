@@ -6,8 +6,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.paginator import Paginator
 from .models import Expense
 from .serializers import ExpenseSerializer
-from .permissions import get_user_permissions
-from users.views import get_current_user_permissions, get_user_permissions_helper
+from users.views import get_user_permissions_helper
 import json
 from datetime import datetime, date
 from calendar import monthrange
@@ -92,8 +91,6 @@ def get_expense_list(request):
     expenses = paginator.get_page(page)
 
     serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
-    print(user_permissions)
-    print(serializer.data)
     return Response({
         'success': True,
         'data': {
