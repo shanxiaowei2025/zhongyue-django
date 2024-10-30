@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from .models import Expense
 from .serializers import ExpenseSerializer
 from .permissions import get_user_permissions
+from users.views import get_current_user_permissions, get_user_permissions_helper
 import json
 from datetime import datetime, date
 from calendar import monthrange
@@ -45,37 +46,36 @@ class ExpenseViewSet(ModelViewSet):
 
         return Response(serializer.data)
 
-def apply_permission_filters(queryset, user, current_role):
-    user_permissions = get_user_permissions(user, current_role)
+def apply_permission_filters(queryset, request):
+    user = request.user
+    user_permissions = get_user_permissions_helper(user)
     
-    if not user_permissions['data']['viewAll']:
+    expense_permissions = user_permissions['permissions']['expense']
+    
+    if not expense_permissions['data']['view_all']:
         filters = Q()
         
-        if user_permissions['data']['viewOwn']:
+        if expense_permissions['data']['view_own']:
             filters |= Q(submitter=user.username)
         
-        if user_permissions['data']['viewByLocation']:
-            filters |= Q(company_location=user_permissions['data']['viewByLocation'])
+        if expense_permissions['data']['view_by_location']:
+            filters |= Q(company_location=user.dept.name)
         
-        if user_permissions['data']['viewDepartmentSubmissions']:
+        if expense_permissions['data']['view_department_submissions']:
             department_users = User.objects.filter(dept_id=user.dept_id).values_list('username', flat=True)
             filters |= Q(submitter__in=department_users)
         
-        if user_permissions['data']['viewUnaudited']:
-            filters |= Q(status=0)
-        
         queryset = queryset.filter(filters)
     
-    return queryset,user_permissions
+    return queryset, expense_permissions
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_expense_list(request):
-    user = request.user
-    current_role = request.query_params.get('current_role', 'default')
-    
     queryset = Expense.objects.all()
-    queryset, user_permissions = apply_permission_filters(queryset, user, current_role)
+    
+    # 应用权限过滤
+    queryset, user_permissions = apply_permission_filters(queryset, request)
     
     # 使用新的函数构建查询条件
     query = build_search_query(request)
@@ -92,6 +92,8 @@ def get_expense_list(request):
     expenses = paginator.get_page(page)
 
     serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
+    print(user_permissions)
+    print(serializer.data)
     return Response({
         'success': True,
         'data': {
@@ -274,7 +276,6 @@ def update_expense(request):
         expense = Expense.objects.get(id=expense_id)
         data = request.data.copy()
         converted_data = {}
-        print(data)
         
         # 字段名称映射
         field_mapping = {
@@ -498,7 +499,7 @@ def export_expenses(request):
     current_role = request.query_params.get('current_role', 'default')
     
     queryset = Expense.objects.all()
-    queryset, user_permissions = apply_permission_filters(queryset, user, current_role)
+    queryset, user_permissions = apply_permission_filters(queryset, request)
     
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="expenses.csv"'
@@ -611,9 +612,9 @@ def get_autocomplete_options(request):
         return Response({'success': False, 'error': 'Invalid field'}, status=status.HTTP_400_BAD_REQUEST)
     
     # 应用权限过滤
-    queryset, _ = apply_permission_filters(Expense.objects.all(), request.user, request.query_params.get('current_role', 'default'))
+    queryset, _ = apply_permission_filters(Expense.objects.all(), request)
     
-    # 获取唯一值，忽略大小写，并按字段值排序
+    # 获取唯一值，忽略大小写并按字段值排序
     values = queryset.annotate(
         lower_field=Lower(field)
     ).filter(
@@ -624,3 +625,4 @@ def get_autocomplete_options(request):
         'success': True,
         'data': list(values)
     })
+

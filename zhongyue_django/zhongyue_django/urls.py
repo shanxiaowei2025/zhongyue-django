@@ -40,6 +40,7 @@ from users.views import (
     get_user_roles,
     get_permissions_list,
     update_permission,
+    get_current_user_permissions,
 )
 
 from django.conf import settings
@@ -72,6 +73,7 @@ urlpatterns = [
     path('customer/', include('customer.urls')),
     path('permission', get_permissions_list, name='get_permissions_list'),  # 新增
     path('permission/update', update_permission, name='update_permission'),  # 新增
+    path('current-user-permissions/', get_current_user_permissions, name='current_user_permissions'),
 ]
 
 if settings.DEBUG:

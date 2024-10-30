@@ -27,6 +27,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Model
 from django.db import models
+from django.db.models import Q
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -611,4 +612,38 @@ def update_permission(request):
             'success': False,
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 将权限检查逻辑提取为独立的工具函数
+def get_user_permissions_helper(user):
+    user_roles = user.roles
+
+    permissions = Permission.objects.filter(role_name__in=user_roles)
+
+    combined_permissions = {
+        'expense': {'data': {}, 'action': {}},
+        'customer': {'data': {}, 'action': {}}
+    }
+
+    for permission in permissions:
+        perm_dict = permission.to_dict()
+        for module in ['expense', 'customer']:
+            for perm_type in ['data', 'action']:
+                for key, value in perm_dict[module][perm_type].items():
+                    if key not in combined_permissions[module][perm_type] or value:
+                        combined_permissions[module][perm_type][key] = value
+
+    return {
+        'roles': user_roles,
+        'permissions': combined_permissions
+    }
+
+# 原来的视图函数现在调用工具函数
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_current_user_permissions(request):
+    permissions_data = get_user_permissions_helper(request.user)
+    return Response({
+        'success': True,
+        'data': permissions_data
+    })
 

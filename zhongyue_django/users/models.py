@@ -116,7 +116,10 @@ class Permission(models.Model):
     expense_action_edit = models.BooleanField(default=False, verbose_name='费用管理-编辑', db_comment='是否可以编辑费用')
     expense_action_delete = models.BooleanField(default=False, verbose_name='费用管理-删除', db_comment='是否可以删除费用')
     expense_action_audit = models.BooleanField(default=False, verbose_name='费用管理-审核', db_comment='是否可以审核费用')
-
+    # 新增两个权限字段
+    expense_action_cancel_audit = models.BooleanField(default=False, verbose_name='费用管理-取消审核', db_comment='是否可以取消审核费用')
+    expense_action_view_receipt = models.BooleanField(default=False, verbose_name='费用管理-查看收据', db_comment='是否可以查看费用收据')
+    
     # 客户信息权限
     customer_data_view_all = models.BooleanField(default=False, verbose_name='客户信息-查看全部', db_comment='是否可以查看所有客户信息')
     customer_data_view_by_location = models.BooleanField(default=False, verbose_name='客户信息-查看本地', db_comment='是否可以查看本地客户信息')
@@ -152,7 +155,9 @@ class Permission(models.Model):
                     'create': self.expense_action_create,
                     'edit': self.expense_action_edit,
                     'delete': self.expense_action_delete,
-                    'audit': self.expense_action_audit
+                    'audit': self.expense_action_audit,
+                    'cancel_audit': self.expense_action_cancel_audit,  # 添加取消审核权限
+                    'view_receipt': self.expense_action_view_receipt   # 添加查看收据权限
                 }
             },
             'customer': {
