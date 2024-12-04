@@ -1,0 +1,7 @@
+Django==5.1.1
+djangorestframework
+djangorestframework-simplejwt
+mysqlclient
+django-cors-headers
+gunicorn==21.2.0
+openpyxl==3.1.2
