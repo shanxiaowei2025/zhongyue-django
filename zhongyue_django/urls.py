@@ -75,6 +75,3 @@ urlpatterns = [
     path('permission/update', update_permission, name='update_permission'),  # 新增
     path('current-user-permissions/', get_current_user_permissions, name='current_user_permissions'),
 ]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

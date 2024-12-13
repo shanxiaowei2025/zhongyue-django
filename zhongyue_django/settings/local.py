@@ -55,9 +55,16 @@ CORS_ALLOW_HEADERS = [
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
     'root': {
@@ -65,3 +72,10 @@ LOGGING = {
         'level': 'DEBUG',
     },
 }
+
+# MinIO开发环境配置
+AWS_ACCESS_KEY_ID = 'zhongyue'  # MinIO Root User
+AWS_SECRET_ACCESS_KEY = 'zhongyue@12345'  # MinIO Root Password
+AWS_S3_ENDPOINT_URL = 'http://192.168.1.13:9000'  # MinIO服务器地址
+MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'  # 媒体文件访问URL
+AWS_S3_USE_SSL = False  # 开发环境使用HTTP

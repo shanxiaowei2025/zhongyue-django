@@ -28,6 +28,7 @@ from django.db import transaction
 from django.db.models import Model
 from django.db import models
 from django.db.models import Q
+from storages.backends.s3boto3 import S3Boto3Storage
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -258,48 +259,75 @@ def reset_password(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def upload_avatar(request):
-    if not os.path.exists(settings.MEDIA_ROOT):
-        os.makedirs(settings.MEDIA_ROOT)
-        
-    data = json.loads(request.body)
-    user_id = data.get('id')
-    avatar_data = data.get('avatar')
-    print(avatar_data)
-    
     try:
-        user = User.objects.get(id=user_id)
+        data = json.loads(request.body)
+        user_id = data.get('id')
+        avatar_data = data.get('avatar')
         
-        # 解码base64图片数据
-        format, imgstr = avatar_data.split(';base64,')
-        ext = format.split('/')[-1]
-        
-        # 生成唯一的文件名
-        filename = f"{uuid.uuid4()}.{ext}"
-        
-        # 保存文件
-        data = ContentFile(base64.b64decode(imgstr))
-        file_path = default_storage.save(f'avatars/{filename}', data)
-        
-        # 更新用户的头像字段
-        full_url = request.build_absolute_uri(settings.MEDIA_URL + file_path)
-        user.avatar = full_url
-        user.save()
-        
-        return JsonResponse({
-            'success': True,
-            'data': [{
-                'avatar_url': full_url
-            }]
-        }, status=status.HTTP_200_OK)
-    except User.DoesNotExist:
+        if not avatar_data or not user_id:
+            return JsonResponse({
+                'success': False,
+                'message': '参数不完整'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # 获取用户信息
+            user = User.objects.get(id=user_id)
+            # 优先使用昵称，如果没有昵称则使用用户名
+            file_prefix = user.nickname or user.username
+            
+            # 生成时间戳
+            timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
+            
+            format, imgstr = avatar_data.split(';base64,')
+            ext = format.split('/')[-1].lower()
+            
+            # 验证文件格式
+            if ext not in ['jpg', 'jpeg', 'png', 'gif']:
+                return JsonResponse({
+                    'success': False,
+                    'message': '不支持的图片格式'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 生成文件名: avatars/用户名或昵称_时间戳.扩展名
+            filename = f"avatars/{file_prefix}_{timestamp}.{ext}"
+            
+            # 解码并保存文件
+            content = base64.b64decode(imgstr)
+            file_obj = ContentFile(content)
+            
+            # 使用事务保证数据一致性
+            with transaction.atomic():
+                storage = default_storage
+                file_path = storage.save(filename, file_obj)
+                
+                # 更新用户头像
+                User.objects.filter(id=user_id).update(avatar=file_path)
+                
+                # 修改返回格式,匹配前端期望的数据结构
+                return JsonResponse({
+                    'success': True,
+                    'data': [{
+                        'avatar_url': file_path  # 返回相对路径即可,前端会通过 getMinioUrl 处理
+                    }]
+                })
+                
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': '用户不存在'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            print(f"Upload error: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': f'上传失败: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except json.JSONDecodeError:
         return JsonResponse({
             'success': False,
-            'data': []
-        }, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'data': []
+            'message': '无效的请求数据'
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @csrf_exempt
@@ -561,7 +589,7 @@ def update_dept(request):
             'remark': data.get('remark')
         }
         
-        # 如果 parentId 为 0，将其设置为 None（表示顶级部门）
+        # 如果 parentId 为 0，将其置为 None（表示顶级部门）
         if backend_data['parent_id'] == 0:
             backend_data['parent_id'] = None
         
@@ -628,7 +656,7 @@ def update_permission(request):
     if not all([role_name, field_name, is_allowed is not None]):
         return JsonResponse({
             'success': False,
-            'message': '缺少必要的参数'
+            'message': '缺少必的参数'
         }, status=status.HTTP_400_BAD_REQUEST)
 
     # 检查字段名是否合法
@@ -664,7 +692,7 @@ def update_permission(request):
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# 将权限检查逻辑提取为独立的工具函数
+# 将权限查逻辑提取为独立的工具函数
 def get_user_permissions_helper(user):
     user_roles = user.roles
 
@@ -688,7 +716,7 @@ def get_user_permissions_helper(user):
         'permissions': combined_permissions
     }
 
-# 原来的视图函数现在调用工具函数
+# 原来的视图函数现在调用具函数
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_current_user_permissions(request):
