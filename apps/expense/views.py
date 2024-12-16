@@ -1,3 +1,4 @@
+from django.shortcuts import render
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -6,7 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.paginator import Paginator
 from .models import Expense
 from .serializers import ExpenseSerializer
-from users.views import get_user_permissions_helper
+from apps.users.views import get_user_permissions_helper
 import json
 from datetime import datetime, date
 from calendar import monthrange
@@ -17,7 +18,7 @@ from django.core.files.storage import default_storage
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
 from django.contrib.auth.models import Group
-from users.models import User
+from apps.users.models import User
 from django.db.models import Q
 import csv
 from django.http import HttpResponse

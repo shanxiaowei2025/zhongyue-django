@@ -16,12 +16,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'users',
+    'apps.users',
+    'apps.customer',
+    'apps.expense',
+    'apps.core.permissions',
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'expense',
-    'customer',
     'storages',
 ]
 
@@ -36,7 +37,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'zhongyue_django.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
@@ -54,7 +55,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'zhongyue_django.wsgi.application'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -98,11 +99,11 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, 'storage/static')
 
 # Media files
-MEDIA_URL = f'http://192.168.1.13:9000/zhongyue/'  # 替换为你的MinIO访问地址
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = f'http://192.168.1.96:9000/zhongyue/'  # 替换为你的MinIO访问地址
+MEDIA_ROOT = os.path.join(BASE_DIR, 'storage/media')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

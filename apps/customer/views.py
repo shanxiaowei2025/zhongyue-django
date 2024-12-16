@@ -26,7 +26,7 @@ from io import BytesIO
 import json
 from django.db import models
 from django.db.models.functions import Lower
-from users.views import get_user_permissions_helper
+from apps.users.views import get_user_permissions_helper
 
 # Create your views here.
 
@@ -304,7 +304,7 @@ def export_customers(request):
     if boss_name:
         queryset = queryset.filter(boss_name__icontains=boss_name)
 
-    # 应用权限过滤
+    # 应��权限过滤
     queryset, _ = apply_permission_filters(queryset, request.user)
 
     # 创建工作簿和工作表
