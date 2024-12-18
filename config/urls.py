@@ -18,4 +18,8 @@ urlpatterns = [
     
     # 客户管理路由
     path('customer/', include('apps.customer.urls')),
+    
+    # 文件上传路由
+    path('fileupload/', include('apps.fileupload.urls')),
+    
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

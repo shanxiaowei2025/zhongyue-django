@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'apps.customer',
     'apps.expense',
     'apps.core.permissions',
+    'apps.fileupload',
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
@@ -124,7 +125,7 @@ STORAGES = {
 # MinIO 通用配置
 AWS_STORAGE_BUCKET_NAME = 'zhongyue'  # 存储桶名称
 AWS_S3_REGION_NAME = 'us-east-1'  # MinIO默认region
-AWS_S3_FILE_OVERWRITE = False  # 不覆盖同名文件
+AWS_S3_FILE_OVERWRITE = True  # 不覆盖同名文件
 AWS_DEFAULT_ACL = 'public-read'  # 默认文件访问权限
 AWS_LOCATION = ''  # 文件存储的基础路径
 AWS_QUERYSTRING_AUTH = False  # 不使用查询字符串认证

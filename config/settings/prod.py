@@ -97,7 +97,7 @@ LOGGING = {
 # MinIO生产环境配置
 AWS_ACCESS_KEY_ID = os.environ.get('MINIO_ACCESS_KEY')
 AWS_SECRET_ACCESS_KEY = os.environ.get('MINIO_SECRET_KEY')
-AWS_S3_ENDPOINT_URL = os.environ.get('MINIO_ENDPOINT_URL', 'http://minio:9000')
+AWS_S3_ENDPOINT_URL = os.environ.get('MINIO_ENDPOINT_URL', 'http://192.168.1.96:9000')
 MEDIA_URL = os.environ.get('MINIO_MEDIA_URL', f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/')
 AWS_S3_USE_SSL = os.environ.get('MINIO_USE_SSL', 'false').lower() == 'true'
 

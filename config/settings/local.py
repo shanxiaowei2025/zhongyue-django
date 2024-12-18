@@ -76,6 +76,6 @@ LOGGING = {
 # MinIO开发环境配置
 AWS_ACCESS_KEY_ID = 'zhongyue'  # MinIO Root User
 AWS_SECRET_ACCESS_KEY = 'zhongyue@12345'  # MinIO Root Password
-AWS_S3_ENDPOINT_URL = 'http://192.168.1.96:9000'  # MinIO服务器地址
+AWS_S3_ENDPOINT_URL = 'https://zhongyue-minio-api.starlogic.tech/'  # MinIO服务器地址
 MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'  # 媒体文件访问URL
 AWS_S3_USE_SSL = False  # 开发环境使用HTTP
