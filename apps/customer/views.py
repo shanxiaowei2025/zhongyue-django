@@ -49,8 +49,7 @@ class CustomerViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-def apply_permission_filters(queryset, request):
-    user = request.user
+def apply_permission_filters(queryset, user):
     user_permissions = get_user_permissions_helper(user)
     customer_permissions = user_permissions['permissions']['customer']
     
@@ -75,7 +74,7 @@ def apply_permission_filters(queryset, request):
 @permission_classes([IsAuthenticated])
 def get_customer_list(request):
     queryset = Customer.objects.all()
-    queryset, customer_permissions = apply_permission_filters(queryset, request)
+    queryset, customer_permissions = apply_permission_filters(queryset, request.user)
 
 
     # 创建字段映射
@@ -120,44 +119,15 @@ def get_customer_list(request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def create_customer(request):
     data = request.data.copy()
-    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
-    
-    for field in image_fields:
-        files = request.FILES.getlist(field)
-        saved_paths = []
-        
-        for file in files:
-            saved_path = save_image(file, request)
-            saved_paths.append(saved_path)
-        
-        data[field] = json.dumps(saved_paths)
-
     serializer = CustomerSerializer(data=data)
     if serializer.is_valid():
         serializer.save(submitter=request.user.username)
-        return Response({'success': True, 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({'success': True, 'data': serializer.data}, 
+                      status=status.HTTP_201_CREATED)
     else:
-        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'success': False, 'errors': serializer.errors}, 
+                      status=status.HTTP_400_BAD_REQUEST)
 
-def save_image(image, request):
-    # 生成一个唯一的文件名，避免中文和特殊字符问题
-    file_extension = Path(image.name).suffix
-    unique_filename = f"{uuid.uuid4().hex}{file_extension}"
-    
-    file_path = Path(settings.MEDIA_ROOT) / 'customer_images' / unique_filename
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    with file_path.open('wb+') as destination:
-        for chunk in image.chunks():
-            destination.write(chunk)
-    
-    relative_url = str(Path(settings.MEDIA_URL) / 'customer_images' / unique_filename).replace('\\', '/')
-    
-    # 使用 escape_uri_path 来确保 URL 是正确编码的
-    escaped_relative_url = escape_uri_path(relative_url)
-    full_url = request.build_absolute_uri(escaped_relative_url)
-    
-    return full_url
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
@@ -166,65 +136,21 @@ def update_customer(request, pk):
     try:
         customer = Customer.objects.get(pk=pk)
     except Customer.DoesNotExist:
-        return Response({'success': False, 'error': 'Customer not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'success': False, 'error': 'Customer not found'}, 
+                      status=status.HTTP_404_NOT_FOUND)
 
     data = request.data.copy()
-    image_fields = ['legal_person_id_images', 'other_id_images', 'business_license_images', 'bank_account_license_images', 'supplementary_images']
-    
-    # 处理非图片字段
-    for key, value in data.items():
-        if key not in image_fields:
-            if value == 'null':
-                data[key] = None
-            elif key in ['has_online_banking', 'is_online_banking_custodian']:
-                data[key] = value.lower() == 'true' if value not in [None, ''] else None
-            elif key in ['registered_capital', 'paid_in_capital']:
-                try:
-                    data[key] = Decimal(value) if value not in [None, ''] else None
-                except InvalidOperation:
-                    data[key] = None
-
-    # 移除 item_permissions 字段
-    data.pop('item_permissions', None)
-    # 处理图片字段
-    for field in image_fields:
-        files = request.FILES.getlist(field)
-        existing_images = data.getlist(field) 
-        
-        if isinstance(existing_images, str):
-            try:
-                existing_images = json.loads(existing_images)
-            except json.JSONDecodeError:
-                existing_images = [existing_images] if existing_images else []
-        elif not isinstance(existing_images, list):
-            existing_images = [existing_images] if existing_images else []
-
-        # 确保 existing_images 是一个扁平的列表
-        existing_images = [item for sublist in existing_images for item in (sublist if isinstance(sublist, list) else [sublist])]
-        
-        new_images = []
-        
-        # 处理现有图片
-        for image in existing_images:
-            if isinstance(image, str):
-                new_images.append(image)
-
-        # 处理新上传的文件
-        for file in files:
-            saved_path = save_image(file, request)
-            new_images.append(saved_path)
-        data[field] =json.dumps(new_images) 
     try:
         serializer = CustomerSerializer(customer, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response({'success': True, 'data': serializer.data})
         else:
-            return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-    except ValidationError as e:
-        return Response({'success': False, 'errors': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'success': False, 'errors': serializer.errors}, 
+                          status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response({'success': False, 'errors': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'success': False, 'errors': str(e)}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
@@ -236,16 +162,6 @@ def delete_customer(request, pk):
 
     customer.delete()
     return Response({'success': True}, status=status.HTTP_204_NO_CONTENT)
-
-def save_images(images):
-    image_urls = []
-    for image in images:
-        file_path = os.path.join(settings.MEDIA_ROOT, 'customer_images', image.name)
-        with open(file_path, 'wb+') as destination:
-            for chunk in image.chunks():
-                destination.write(chunk)
-        image_urls.append(os.path.join(settings.MEDIA_URL, 'customer_images', image.name))
-    return image_urls
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -304,7 +220,7 @@ def export_customers(request):
     if boss_name:
         queryset = queryset.filter(boss_name__icontains=boss_name)
 
-    # 应��权限过滤
+    # 应用权限过滤
     queryset, _ = apply_permission_filters(queryset, request.user)
 
     # 创建工作簿和工作表
