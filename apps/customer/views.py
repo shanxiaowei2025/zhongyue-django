@@ -100,8 +100,6 @@ def get_customer_list(request):
     customers = paginator.get_page(page)
 
     serializer = CustomerSerializer(customers, many=True, context={'request': request})
-    print(serializer.data)
-    print(customer_permissions)
     return Response({
         'success': True,
         'data': {

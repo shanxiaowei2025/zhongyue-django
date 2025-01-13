@@ -629,68 +629,125 @@ def get_user_roles(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_permissions_list(request):
-    permissions = Permission.objects.all()
-    permissions_data = []
+    """获取所有角色的权限列表"""
+    try:
+        # 获取所有启用的角色
+        roles = Role.objects.filter(status=1)
+        permissions_data = []
 
-    for permission in permissions:
-        permissions_data.append({
-            'role_name': permission.role_name,
-            'permissions': permission.to_dict()
+        for role in roles:
+            # 构建权限数据结构
+            permissions = {
+                'expense': {
+                    'data': {
+                        'view_all': False,
+                        'view_by_location': False,
+                        'view_department_submissions': False,
+                        'view_own': False
+                    },
+                    'action': {
+                        'create': False,
+                        'edit': False,
+                        'delete': False,
+                        'audit': False,
+                        'cancel_audit': False,
+                        'view_receipt': False
+                    }
+                },
+                'customer': {
+                    'data': {
+                        'view_all': False,
+                        'view_by_location': False,
+                        'view_department_submissions': False,
+                        'view_own': False
+                    },
+                    'action': {
+                        'create': False,
+                        'edit': False,
+                        'delete': False
+                    }
+                }
+            }
+
+            # 获取该角色的所有权限记录
+            role_permissions = Permission.objects.filter(role=role)
+
+            # 设置权限值
+            for perm in role_permissions:
+                parts = perm.permission_name.split('_')
+                if len(parts) >= 3:
+                    module = parts[0]  # expense/customer
+                    perm_type = parts[1]  # data/action
+                    action = '_'.join(parts[2:])  # view_all/create 等
+                    
+                    if module in permissions and perm_type in permissions[module]:
+                        if action in permissions[module][perm_type]:
+                            permissions[module][perm_type][action] = perm.permission_value
+
+            # 添加到结果列表
+            role_data = {
+                'role_name': role.name,  # 确保返回角色名称
+                'permissions': permissions
+            }
+            permissions_data.append(role_data)
+
+        return JsonResponse({
+            'success': True,
+            'data': permissions_data
         })
-    print(permissions_data)
-    return JsonResponse({
-        'success': True,
-        'data': permissions_data
-    })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'获取权限列表失败: {str(e)}'
+        }, status=500)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_permission(request):
-    data = json.loads(request.body)
-    print(data)
-    role_name = data.get('role')
-    field_name = data.get('field')
-    is_allowed = data.get('isAllowed')
-    
-
-    if not all([role_name, field_name, is_allowed is not None]):
-        return JsonResponse({
-            'success': False,
-            'message': '缺少必的参数'
-        }, status=status.HTTP_400_BAD_REQUEST)
-
-    # 检查字段名是否合法
-    valid_fields = [f.name for f in Permission._meta.fields if isinstance(f, models.BooleanField)]
-    if field_name not in valid_fields:
-        return JsonResponse({
-            'success': False,
-            'message': '无效的权限字段'
-        }, status=status.HTTP_400_BAD_REQUEST)
-
+    """更新角色权限"""
     try:
-        with transaction.atomic():
-            print(role_name)
-            permission = Permission.objects.get(role_name=role_name)
-            setattr(permission, field_name, is_allowed)
-            permission.save()
-            
-            # 更新后重新获取权限数据
-            updated_permission = Permission.objects.get(role_name=role_name)
+        data = json.loads(request.body)
+        role_name = data.get('role')
+        field = data.get('field')  # 格式如: 'expense_data_view_all'
+        is_allowed = data.get('isAllowed')
+
+        if not all([role_name, field, is_allowed is not None]):
             return JsonResponse({
-                'success': True,
-                'message': f'已更新 {role_name} 的 {field_name} 权限',
-                'data': updated_permission.to_dict()
-            })
+                'success': False,
+                'message': '缺少必要参数'
+            }, status=400)
+
+        # 获取角色
+        role = Role.objects.get(name=role_name)
+        
+        # 更新权限
+        permission = Permission.objects.get(
+            role=role,
+            permission_name=field
+        )
+        permission.permission_value = is_allowed
+        permission.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'已更新 {role_name} 的权限'
+        })
+
+    except Role.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '角色不存在'
+        }, status=404)
     except Permission.DoesNotExist:
         return JsonResponse({
             'success': False,
-            'message': '权限记录不存在'
-        }, status=status.HTTP_404_NOT_FOUND)
+            'message': '权限不存在'
+        }, status=404)
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            'message': f'更新权限失败: {str(e)}'
+        }, status=500)
 
 # 将权限查逻辑提取为独立的工具函数
 def get_user_permissions_helper(user):

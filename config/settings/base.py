@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.customer',
     'apps.expense',
+    'apps.contract',
     'apps.core.permissions',
     'apps.fileupload',
     'rest_framework',

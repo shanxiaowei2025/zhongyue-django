@@ -22,4 +22,7 @@ urlpatterns = [
     # 文件上传路由
     path('fileupload/', include('apps.fileupload.urls')),
     
+    # 合同管理路由
+    path('contract/', include('apps.contract.urls')),
+    
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

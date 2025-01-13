@@ -106,108 +106,68 @@ class Department(models.Model):
         db_table = 'zy_department'
 
 class Permission(models.Model):
-    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='permissions', verbose_name='角色', db_comment='关联的角色',to_field='id')
+    """权限表"""
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='permissions', verbose_name='角色', db_comment='关联的角色')
     role_name = models.CharField(max_length=50, verbose_name='角色名称', db_comment='角色名称')
-    
-    # 费用管理权限
-    expense_data_view_all = models.BooleanField(default=False, verbose_name='费用管理-查看全部', db_comment='是否可以查看所有费用数据')
-    expense_data_view_by_location = models.BooleanField(default=False, verbose_name='费用管理-查看本地', db_comment='是否可以查看本地费用数据')
-    expense_data_view_department_submissions = models.BooleanField(default=False, verbose_name='费用管理-查看部门', db_comment='是否可以查看部门费用数据')
-    expense_data_view_own = models.BooleanField(default=False, verbose_name='费用管理-查看自己', db_comment='是否可以查看自己的费用数据')
-    expense_action_create = models.BooleanField(default=False, verbose_name='费用管理-创建', db_comment='是否可以创建费用')
-    expense_action_edit = models.BooleanField(default=False, verbose_name='费用管理-编辑', db_comment='是否可以编辑费用')
-    expense_action_delete = models.BooleanField(default=False, verbose_name='费用管理-删除', db_comment='是否可以删除费用')
-    expense_action_audit = models.BooleanField(default=False, verbose_name='费用管理-审核', db_comment='是否可以审核费用')
-    # 新增两个权限字段
-    expense_action_cancel_audit = models.BooleanField(default=False, verbose_name='费用管理-取消审核', db_comment='是否可以取消审核费用')
-    expense_action_view_receipt = models.BooleanField(default=False, verbose_name='费用管理-查看收据', db_comment='是否可以查看费用收据')
-    
-    # 客户信息权限
-    customer_data_view_all = models.BooleanField(default=False, verbose_name='客户信息-查看全部', db_comment='是否可以查看所有客户信息')
-    customer_data_view_by_location = models.BooleanField(default=False, verbose_name='客户信息-查看本地', db_comment='是否可以查看本地客户信息')
-    customer_data_view_department_submissions = models.BooleanField(default=False, verbose_name='客户信息-查看部门', db_comment='是否可以查看部门客户信息')
-    customer_data_view_own = models.BooleanField(default=False, verbose_name='客户信息-查看自己', db_comment='是否可以查看自己的客户信息')
-    customer_action_create = models.BooleanField(default=False, verbose_name='客户信息-创建', db_comment='是否可以创建客户信息')
-    customer_action_edit = models.BooleanField(default=False, verbose_name='客户信息-编辑', db_comment='是否可以编辑客户信息')
-    customer_action_delete = models.BooleanField(default=False, verbose_name='客户信息-删除', db_comment='是否可以删除客户信息')
+    page_name = models.CharField(max_length=50, verbose_name='页面名称', db_comment='权限所属的页面名称，如：合同管理')
+    permission_name = models.CharField(max_length=100, verbose_name='权限名称', db_comment='权限名称，如：contract_data_view_all')
+    permission_value = models.BooleanField(default=False, verbose_name='权限值', db_comment='是否拥有该权限')
+    description = models.CharField(max_length=200, verbose_name='权限描述', db_comment='权限的中文描述')
 
     class Meta:
         db_table = 'zy_permission'
-        unique_together = ('role',)
+        unique_together = ('role', 'permission_name')
+        ordering = ['page_name', 'permission_name']
 
     def __str__(self):
-        return f"{self.role_name} 的权限"
+        return f"{self.role_name} - {self.page_name} - {self.description}"
+
+    def to_dict(self):
+        """返回单个权限记录的字典表示"""
+        return {
+            'role_name': self.role_name,
+            'page_name': self.page_name,
+            'permission_name': self.permission_name,
+            'permission_value': self.permission_value,
+            'description': self.description
+        }
 
     def save(self, *args, **kwargs):
         if not self.role_name:
             self.role_name = self.role.name
         super().save(*args, **kwargs)
 
-    def to_dict(self):
-        return {
-            'role_name': self.role_name,
-            'expense': {
-                'data': {
-                    'view_all': self.expense_data_view_all,
-                    'view_by_location': self.expense_data_view_by_location,
-                    'view_department_submissions': self.expense_data_view_department_submissions,
-                    'view_own': self.expense_data_view_own
-                },
-                'action': {
-                    'create': self.expense_action_create,
-                    'edit': self.expense_action_edit,
-                    'delete': self.expense_action_delete,
-                    'audit': self.expense_action_audit,
-                    'cancel_audit': self.expense_action_cancel_audit,  # 添加取消审核权限
-                    'view_receipt': self.expense_action_view_receipt   # 添加查看收据权限
-                }
-            },
-            'customer': {
-                'data': {
-                    'view_all': self.customer_data_view_all,
-                    'view_by_location': self.customer_data_view_by_location,
-                    'view_department_submissions': self.customer_data_view_department_submissions,
-                    'view_own': self.customer_data_view_own
-                },
-                'action': {
-                    'create': self.customer_action_create,
-                    'edit': self.customer_action_edit,
-                    'delete': self.customer_action_delete
-                }
-            }
-        }
-
 @receiver(post_save, sender=Role)
 def create_or_update_permission(sender, instance, created, **kwargs):
-    """当角色创建或更新时，同步更新权限表"""
+    """当角色创建或更新时，同步更新权限"""
     if created:
-        # 创建新角色时，初始化权限记录
-        Permission.objects.create(
-            role=instance,
-            role_name=instance.name
-        )
+        # 获取现有的所有权限名称和描述
+        existing_permissions = Permission.objects.exclude(role=instance).values(
+            'permission_name', 'description', 'page_name'
+        ).distinct()
+        
+        # 为新角色创建所有权限记录
+        for perm in existing_permissions:
+            Permission.objects.create(
+                role=instance,
+                role_name=instance.name,
+                page_name=perm['page_name'],
+                permission_name=perm['permission_name'],
+                description=perm['description'],
+                permission_value=False  # 默认无权限
+            )
     else:
-        # 更新角色时，同步更新权限表中的角色名称
+        # 更新角色时，只更新角色名称
         Permission.objects.filter(role=instance).update(role_name=instance.name)
-
-# 在 Role 类的 Meta 类后面添加
-Role.post_save = post_save.connect(create_or_update_permission, sender=Role)
 
 @receiver(post_delete, sender=Role)
 def delete_role_permissions(sender, instance, **kwargs):
-    """当角色被删除时，同步删除权限记录和更新用户角色"""
+    """当角色被删除时，同步删除权限记录"""
     try:
-        # 删除对应的权限记录
         Permission.objects.filter(role_name=instance.name).delete()
-        
-        # 更新所有用户的角色列表
-        users = User.objects.all()
-        for user in users:
-            if instance.name in user.roles:
-                user.roles.remove(instance.name)
-                user.save()
     except Exception as e:
         print(f"Error in delete_role_permissions: {str(e)}")
 
 # 确保信号被注册
+Role.post_save = post_save.connect(create_or_update_permission, sender=Role)
 Role.post_delete = post_delete.connect(delete_role_permissions, sender=Role)
