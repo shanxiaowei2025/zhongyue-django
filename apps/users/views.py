@@ -666,6 +666,19 @@ def get_permissions_list(request):
                         'edit': False,
                         'delete': False
                     }
+                },
+                'contract': {  # 新增合同管理权限
+                    'data': {
+                        'view_all': False,
+                        'view_by_location': False,
+                        'view_department_submissions': False,
+                        'view_own': False
+                    },
+                    'action': {
+                        'create': False,
+                        'edit': False,
+                        'delete': False
+                    }
                 }
             }
 
@@ -676,7 +689,7 @@ def get_permissions_list(request):
             for perm in role_permissions:
                 parts = perm.permission_name.split('_')
                 if len(parts) >= 3:
-                    module = parts[0]  # expense/customer
+                    module = parts[0]  # expense/customer/contract
                     perm_type = parts[1]  # data/action
                     action = '_'.join(parts[2:])  # view_all/create 等
                     
@@ -686,7 +699,7 @@ def get_permissions_list(request):
 
             # 添加到结果列表
             role_data = {
-                'role_name': role.name,  # 确保返回角色名称
+                'role_name': role.name,
                 'permissions': permissions
             }
             permissions_data.append(role_data)
@@ -749,34 +762,42 @@ def update_permission(request):
             'message': f'更新权限失败: {str(e)}'
         }, status=500)
 
-# 将权限查逻辑提取为独立的工具函数
 def get_user_permissions_helper(user):
+    """获取用户权限的辅助函数"""
     user_roles = user.roles
 
+    # 获取用户所有角色的权限
     permissions = Permission.objects.filter(role_name__in=user_roles)
 
+    # 初始化权限字典
     combined_permissions = {
         'expense': {'data': {}, 'action': {}},
-        'customer': {'data': {}, 'action': {}}
+        'customer': {'data': {}, 'action': {}},
+        'contract': {'data': {}, 'action': {}}  # 新增合同管理权限
     }
 
+    # 合并权限（任一角色有权限即为True）
     for permission in permissions:
         perm_dict = permission.to_dict()
-        for module in ['expense', 'customer']:
-            for perm_type in ['data', 'action']:
-                for key, value in perm_dict[module][perm_type].items():
-                    if key not in combined_permissions[module][perm_type] or value:
-                        combined_permissions[module][perm_type][key] = value
+        parts = permission.permission_name.split('_')
+        if len(parts) >= 3:
+            module = parts[0]  # expense/customer/contract
+            perm_type = parts[1]  # data/action
+            action = '_'.join(parts[2:])  # view_all/create 等
+            
+            if module in combined_permissions and perm_type in combined_permissions[module]:
+                if action not in combined_permissions[module][perm_type] or permission.permission_value:
+                    combined_permissions[module][perm_type][action] = permission.permission_value
 
     return {
         'roles': user_roles,
         'permissions': combined_permissions
     }
 
-# 原来的视图函数现在调用具函数
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_current_user_permissions(request):
+    """获取当前用户的权限"""
     permissions_data = get_user_permissions_helper(request.user)
     return Response({
         'success': True,

@@ -3,14 +3,44 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Q
+from django.core.paginator import Paginator
 from .models import Contract
 from .serializers import ContractSerializer
+from apps.users.views import get_user_permissions_helper
+
+def apply_permission_filters(queryset, user):
+    """
+    根据用户权限过滤合同数据
+    """
+    user_permissions = get_user_permissions_helper(user)
+    contract_permissions = user_permissions['permissions']['contract']
+    
+    if not contract_permissions['data']['view_all']:
+        filters = Q()
+        
+        if contract_permissions['data']['view_own']:
+            filters |= Q(submitter=user.nickname)
+        
+        if contract_permissions['data']['view_by_location']:
+            # 假设合同表中有 business_location 字段，根据实际情况调整
+            filters |= Q(business_location__icontains=user.location)
+        
+        if contract_permissions['data']['view_department_submissions']:
+            department_users = user.objects.filter(dept_id=user.dept_id).values_list('username', flat=True)
+            filters |= Q(submitter__in=department_users)
+        
+        queryset = queryset.filter(filters)
+    
+    return queryset, contract_permissions
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def contract_list(request):
     """获取合同列表"""
     queryset = Contract.objects.all()
+    
+    # 应用权限过滤
+    queryset, contract_permissions = apply_permission_filters(queryset, request.user)
     
     # 企业名称搜索
     company_name = request.query_params.get('company_name', None)
@@ -41,10 +71,28 @@ def contract_list(request):
     if contract_status:
         queryset = queryset.filter(contract_status=contract_status)
     
-    serializer = ContractSerializer(queryset, many=True)
+    # 获取分页参数
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 10))
+    
+    # 排序
+    queryset = queryset.order_by('-id')
+    
+    # 分页
+    paginator = Paginator(queryset, page_size)
+    contracts = paginator.get_page(page)
+    
+    serializer = ContractSerializer(contracts, many=True)
+    
     return Response({
         'success': True,
-        'data': serializer.data
+        'data': {
+            'list': serializer.data,
+            'total': paginator.count,
+            'pageSize': page_size,
+            'currentPage': page,
+            'permissions': contract_permissions
+        }
     })
 
 @api_view(['POST'])
