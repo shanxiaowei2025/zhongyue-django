@@ -12,8 +12,8 @@ python manage.py collectstatic --noinput
 
 # 删除所有迁移文件
 echo "Cleaning old migrations..."
-find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
-find . -path "*/migrations/*.pyc" -delete
+find ./apps -path "*/migrations/*.py" -not -name "__init__.py" -delete
+find ./apps -path "*/migrations/*.pyc" -delete
 
 # 首先为 users 应用生成迁移文件
 echo "Making migrations for users app..."
