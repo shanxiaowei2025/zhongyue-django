@@ -42,34 +42,39 @@ def contract_list(request):
     # 应用权限过滤
     queryset, contract_permissions = apply_permission_filters(queryset, request.user)
     
-    # 企业名称搜索
-    company_name = request.query_params.get('company_name', None)
-    if company_name:
-        queryset = queryset.filter(company_name__icontains=company_name)
+    # 合同编号搜索
+    contract_no = request.query_params.get('contract_no', None)
+    if contract_no:
+        queryset = queryset.filter(contract_no__icontains=contract_no)
     
-    # 合同类型筛选
-    contract_type = request.query_params.get('contract_type', None)
-    if contract_type:
-        queryset = queryset.filter(contract_type=contract_type)
+    # 客户名称搜索
+    customer_name = request.query_params.get('customer_name', None)
+    if customer_name:
+        queryset = queryset.filter(customer_name__icontains=customer_name)
         
     # 业务类型筛选
     business_type = request.query_params.get('business_type', None)
     if business_type:
         queryset = queryset.filter(business_type=business_type)
     
+    # 业务人员筛选
+    business_person = request.query_params.get('business_person', None)
+    if business_person:
+        queryset = queryset.filter(business_person__icontains=business_person)
+    
     # 日期范围筛选
     start_date = request.query_params.get('start_date', None)
     end_date = request.query_params.get('end_date', None)
     if start_date and end_date:
         queryset = queryset.filter(
-            Q(start_date__gte=start_date) &
-            Q(end_date__lte=end_date)
+            Q(sign_date__gte=start_date) &
+            Q(sign_date__lte=end_date)
         )
     
     # 合同状态筛选
-    contract_status = request.query_params.get('contract_status', None)
-    if contract_status:
-        queryset = queryset.filter(contract_status=contract_status)
+    status = request.query_params.get('status', None)
+    if status:
+        queryset = queryset.filter(status=status)
     
     # 获取分页参数
     page = int(request.query_params.get('page', 1))
