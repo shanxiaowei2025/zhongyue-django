@@ -32,4 +32,4 @@ echo "Applying other migrations..."
 python manage.py migrate
 
 # 使用gunicorn启动应用
-exec gunicorn -c gunicorn_config.py zhongyue_django.wsgi:application
+exec gunicorn -c gunicorn_config.py config.wsgi:application
