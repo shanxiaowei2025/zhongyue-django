@@ -1,0 +1,63 @@
+# 指定版本
+version: '3.8'
+
+# 服务列表
+services:
+  # 后端服务
+  backend:
+    build: . # 指定构建上下文路径
+    container_name: zhongyue-backend # 指定容器名称
+    restart: always # 指定容器重启策略
+    ports:
+      - "8000:8000" # 指定端口映射
+    # 挂载目录
+    volumes:
+      - ./storage/static:/app/storage/static # 挂载静态文件目录
+      - ./storage/media:/app/storage/media # 挂载媒体文件目录
+      - ./logs:/data/apps/web/logs # 挂载日志目录
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local # 指定Django设置模块
+      - DJANGO_ENV=development #  指定Django环境
+      - DB_HOST=host.docker.internal  # 指定数据库主机地址
+      - DB_PORT=3306 # 指定数据库端口
+      - DB_NAME=zhongyue # 指定数据库名称
+      - DB_USER=zhongyue # 指定数据库用户名
+      - DB_PASSWORD=zhongyue123 # 指定数据库密码
+    command: >
+      bash -c "python manage.py migrate --fake-initial && python manage.py runserver 0.0.0.0:8000"
+    # depends_on: # 指定依赖服务
+    #   db: 
+    #     condition: service_healthy # 指定依赖服务健康检查
+    networks:
+      - zhongyue-network # 指定网络
+
+  # 数据库服务
+#   db: 
+#     image: mysql:8.0 # 指定镜像
+#     container_name: zhongyue-db # 指定容器名称
+#     restart: always # 指定容器重启策略
+#     environment:
+#       - MYSQL_DATABASE=zhongyue # 指定数据库名称
+#       - MYSQL_USER=zhongyue # 指定数据库用户名
+#       - MYSQL_PASSWORD=zhongyue123 # 指定数据库密码
+#       - MYSQL_ROOT_PASSWORD=zhongyue123 # 指定数据库root密码
+#     ports:
+#       - "3306:3306" # 指定端口映射
+#     volumes:
+#       - mysql_data:/var/lib/mysql # 挂载数据库数据目录
+#     networks:
+#       - zhongyue-network # 指定网络
+#     healthcheck:
+#       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "zhongyue", "-pzhongyue123"] # 指定健康检查命令  
+#       interval: 5s # 指定健康检查间隔
+#       timeout: 5s # 指定健康检查超时时间
+#       retries: 5 # 指定健康检查重试次数
+
+# # 挂载目录
+# volumes:
+#   mysql_data: # 挂载数据库数据目录
+
+# 网络
+networks:
+  zhongyue-network:
+    driver: bridge # 指定网络驱动

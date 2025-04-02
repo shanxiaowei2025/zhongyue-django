@@ -1,34 +1,34 @@
-from django.shortcuts import render
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+from django.shortcuts import render # type: ignore
+from rest_framework.views import APIView # type: ignore
+from rest_framework.response import Response # type: ignore
+from rest_framework import status # type: ignore
+from rest_framework_simplejwt.tokens import RefreshToken # type: ignore
+from django.contrib.auth import authenticate # type: ignore
 from .serializers import UserSerializer, LoginSerializer, RoleSerializer, DepartmentSerializer  
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework_simplejwt.exceptions import TokenError
+from django.utils.decorators import method_decorator # type: ignore
+from django.views.decorators.csrf import csrf_exempt # type: ignore
+from rest_framework_simplejwt.exceptions import TokenError # type: ignore
 import logging
 from .models import AsyncRoute, Role, Department, Permission
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from django.http import JsonResponse
-from django.core.paginator import Paginator
+from rest_framework.decorators import api_view, permission_classes # type: ignore
+from rest_framework.permissions import IsAuthenticated # type: ignore
+from django.http import JsonResponse # type: ignore
+from django.core.paginator import Paginator # type: ignore
 import json
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model # type: ignore
 import time
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile # type: ignore
 import base64
 import uuid
 import os
-from django.conf import settings
-from django.core.files.storage import default_storage
-from django.utils import timezone
-from django.db import transaction
-from django.db.models import Model
-from django.db import models
-from django.db.models import Q
-from storages.backends.s3boto3 import S3Boto3Storage
+from django.conf import settings # type: ignore
+from django.core.files.storage import default_storage # type: ignore
+from django.utils import timezone # type: ignore
+from django.db import transaction # type: ignore
+from django.db.models import Model # type: ignore
+from django.db import models # type: ignore
+from django.db.models import Q # type: ignore
+from storages.backends.s3boto3 import S3Boto3Storage # type: ignore
 
 User = get_user_model()
 logger = logging.getLogger(__name__)

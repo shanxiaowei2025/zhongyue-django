@@ -2,6 +2,7 @@
 本地开发环境配置
 """
 from .base import *
+import os
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-)j@uyra!t*c2$k&i=8nb7*0qc%=3_)m1b&d7zf77i!0tjw_)7x'
@@ -9,19 +10,20 @@ SECRET_KEY = 'django-insecure-)j@uyra!t*c2$k&i=8nb7*0qc%=3_)m1b&d7zf77i!0tjw_)7x
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1','*']
 
 # Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'zhongyue',
-        'USER': 'root',
-        'PASSWORD': 'ls231007',
-        'HOST': 'localhost',
-        'PORT': '3306',
+        'NAME': os.environ.get('DB_NAME', 'zhongyue'),
+        'USER': os.environ.get('DB_USER', 'zhongyue'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'zhongyue123'),
+        'HOST': os.environ.get('DB_HOST', 'db'),  # 使用 docker-compose 中定义的服务名
+        'PORT': os.environ.get('DB_PORT', '3306'),
         'OPTIONS': {
             'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         }
     }
 }

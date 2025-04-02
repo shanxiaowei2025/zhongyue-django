@@ -15,6 +15,7 @@ class User(AbstractUser):
     user_groups = models.JSONField(default=list, verbose_name='用户组列表', db_comment='用户组列表，JSON格式')
     user_permissions = models.JSONField(default=list, verbose_name='用户权限列表', db_comment='用户权限列表，JSON格式')
     is_expense_auditor = models.BooleanField(default=False, verbose_name="是否为费用审核员")
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -32,17 +33,18 @@ class User(AbstractUser):
             'remark': self.remark,
             'createTime': self.date_joined.timestamp() * 1000,
             'roles': self.roles,
-            'user_groups': self.user_groups,  # 添加 groups 字段
-            'user_permissions': self.user_permissions,  # 添加 permissions 字段
+            'user_groups': self.user_groups,
+            'user_permissions': self.user_permissions,
             'is_expense_auditor': self.is_expense_auditor
         }
 
-    # 添加这两行来覆盖默认的多对多关系
+    # 完全禁用 AbstractUser 的关系字段
     groups = None
-    user_permissions = None
+    user_permissions = None  # 禁用原有的 ManyToManyField
 
     def has_role(self, role_name):
         return role_name in self.roles
+
     class Meta:
         db_table = 'zy_user'
 
